@@ -10,13 +10,15 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Investigator } from '../types/game';
+import { RecoveryMethod } from '../utils/brpEngine';
 import { InvestigatorCrest } from './EntityArtwork';
 
 interface CharacterSheetProps {
   investigator: Investigator;
   useEndurecimiento: boolean;
-  onRollSkill: (label: string, target: number) => void;
+  onRollSkill: (label: string, target: number, isInhCheck?: boolean) => void;
   onUseLazo: (lazoId: string, mode: 'REFUGIO' | 'INHIBICION') => void;
+  onRecover?: (method: RecoveryMethod) => void;
   onUseGrietaHint?: () => void;
 }
 
@@ -38,6 +40,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
   useEndurecimiento,
   onRollSkill,
   onUseLazo,
+  onRecover,
 }) => {
   const [tab, setTab] = useState<'STATS' | 'GRIETA' | 'FILIAS' | 'LAZOS'>('STATS');
 
@@ -190,6 +193,20 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
           </div>
         </div>
 
+        {investigator.diarioPendingSkillBonus && (
+          <div className="rounded-lg border border-[#c59b4e]/55 bg-[#c59b4e]/12 px-2.5 py-2 text-[11px] text-[#e5be6e]">
+            Diario de la Caída (3.7): +10% listo para tu próxima tirada.
+          </div>
+        )}
+
+        {(investigator.isCascaron || investigator.isDead) && (
+          <div className="rounded-lg border border-[#d43750]/65 bg-[#9e1b32]/20 px-2.5 py-2 text-[11px] text-[#ff8fa0] font-medium">
+            {investigator.isDead
+              ? 'Estado crítico: CON permanente en 0 (colapso físico).'
+              : 'Estado Cascarón (POD ≤ 20): portavoz involuntario de la entidad.'}
+          </div>
+        )}
+
         {investigator.arrebatoRounds > 0 && investigator.activeArrebato && (
           <div className="rounded-lg border border-[#d43750]/65 bg-[#9e1b32]/22 p-2.5 text-xs">
             <div className="font-semibold text-[#ff8fa0]">
@@ -324,15 +341,28 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                 <button
                   type="button"
                   onClick={() =>
-                    onRollSkill('Tirada de Inhibición (INH)', investigator.inh)
+                    onRollSkill(
+                      'Tirada de Inhibición (INH)',
+                      investigator.inh,
+                      true
+                    )
                   }
                   className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg bg-[#9e1b32]/15 hover:bg-[#9e1b32]/28 border border-[#9e1b32]/45 text-xs transition-colors"
+                  title={
+                    !investigator.firstInhRollDone
+                      ? 'Regla de la Primera Vez (3.2): se tira contra tu POD completo.'
+                      : undefined
+                  }
                 >
                   <span className="text-[#e07a8a] font-medium">
                     Tirada de Inhibición
+                    {!investigator.firstInhRollDone ? ' (1.ª vez · POD)' : ''}
                   </span>
                   <span className="font-mono-tabular font-semibold text-[#e07a8a]">
-                    {investigator.inh}%
+                    {!investigator.firstInhRollDone
+                      ? investigator.attributes.POD
+                      : investigator.inh}
+                    %
                   </span>
                 </button>
               </div>
@@ -474,12 +504,43 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
         )}
 
         {tab === 'LAZOS' && (
-          <div className="space-y-2.5 text-xs">
-            <p className="text-[#7c7166] leading-relaxed">
-              Los Lazos Íntimos (Sección 7) ofrecen Refugio del Cuerpo (+1d3 COR y
-              +1d3 AC, 1/sesión) o pueden gastarse para amortiguar hasta 6 puntos de
-              INH.
+          <div className="space-y-3 text-xs">
+            <p className="text-[#9b8f82] leading-relaxed">
+              Los Lazos Íntimos (Sección 7.2) ofrecen Refugio del Cuerpo (+1d3
+              COR, +1d3 AC, +1 INH, 1/sesión) o amortiguan 6 puntos de INH al
+              aferrarse al vínculo.
             </p>
+
+            {onRecover && (
+              <div className="p-2.5 rounded-lg bg-[#09080c] border border-[#2e7d7b]/40 space-y-2">
+                <div className="text-[10px] uppercase tracking-wider text-[#6ad1cc] font-semibold">
+                  Válvulas de Recuperación (Sección 7)
+                </div>
+                <div className="grid grid-cols-1 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => onRecover('VELO_DISTANCIA')}
+                    className="w-full text-left px-2.5 py-1.5 rounded border border-[#2e7d7b]/50 bg-[#2e7d7b]/15 hover:bg-[#2e7d7b]/25 text-[#ece3d5] transition-colors flex items-center justify-between"
+                  >
+                    <span>Velo y distancia</span>
+                    <span className="font-mono-tabular text-[11px] text-[#6ad1cc]">
+                      +1 INH / +1 COR
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onRecover('TRAUMA_PURGATIVO')}
+                    className="w-full text-left px-2.5 py-1.5 rounded border border-[#c59b4e]/45 bg-[#c59b4e]/10 hover:bg-[#c59b4e]/20 text-[#ece3d5] transition-colors flex items-center justify-between"
+                  >
+                    <span>Trauma purgativo</span>
+                    <span className="font-mono-tabular text-[11px] text-[#e5be6e]">
+                      +1d3 INH / -1 COR
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {investigator.lazos.map((lazo) => (
               <div
                 key={lazo.id}
@@ -489,7 +550,7 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                   <span className="font-semibold text-[#ece3d5]">{lazo.name}</span>
                   <span
                     className={`text-[10px] ${
-                      lazo.spent ? 'text-[#7c7166]' : 'text-[#e5be6e]'
+                      lazo.spent ? 'text-[#9b8f82]' : 'text-[#e5be6e]'
                     }`}
                   >
                     {lazo.spent ? 'Lazo gastado' : 'Activo ♥'}
@@ -504,11 +565,11 @@ export const CharacterSheet: React.FC<CharacterSheetProps> = ({
                       onClick={() => onUseLazo(lazo.id, 'REFUGIO')}
                       className={`px-2 py-1 rounded text-[11px] border transition-colors whitespace-nowrap ${
                         lazo.refugeUsedThisSession
-                          ? 'opacity-40 cursor-not-allowed border-[#7c7166]/20 text-[#7c7166]'
+                          ? 'opacity-40 cursor-not-allowed border-[#9b8f82]/20 text-[#9b8f82]'
                           : 'border-[#2e7d7b]/60 bg-[#2e7d7b]/15 hover:bg-[#2e7d7b]/30 text-[#6ad1cc]'
                       }`}
                     >
-                      Refugio (+1d3 COR/AC)
+                      Refugio (+1d3 COR/AC, +1 INH)
                     </button>
                     <button
                       type="button"

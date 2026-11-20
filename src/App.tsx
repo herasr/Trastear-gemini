@@ -8,38 +8,19 @@ import {
   EyeOff,
   Flame,
   HeartHandshake,
+  Lock,
   RotateCcw,
   ScrollText,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
   Swords,
 } from 'lucide-react';
-import {
-  BestiaryEntity,
-  ChronicleLog,
-  ConsentDocument,
-  DiarioEntry,
-  DiceRollResult,
-  DifficultyLevel,
-  GameState,
-  Investigator,
-  NarrativeLevel,
-  SceneChoice,
-  SceneOutcome,
-  StoryArc,
-} from './types/game';
+import { Investigator, StoryArc } from './types/game';
 import { INVESTIGATORS } from './data/investigators';
-import { BESTIARY_ENTITIES } from './data/bestiary';
-import { STORY_ARCS, STORY_NODES } from './data/scenarios';
-import { GRIMORIO_SPELLS, TABLA_B } from './data/tables';
-import {
-  applyInhibitionLoss,
-  pickFromD100Table,
-  rollD100,
-  rollDiceNotation,
-  rollDie,
-} from './utils/brpEngine';
-import { soundEngine } from './utils/soundEngine';
+import { STORY_ARCS } from './data/scenarios';
+import { filterByHardLimits } from './utils/brpEngine';
+import { DEFAULT_CONSENT, useGameSession } from './hooks/useGameSession';
 import { OccultCanvas } from './components/OccultCanvas';
 import { SafetyBar } from './components/SafetyBar';
 import { DiceRoller } from './components/DiceRoller';
@@ -51,25 +32,7 @@ import { CompendiumView } from './components/CompendiumView';
 import { EntityArtwork, InvestigatorCrest } from './components/EntityArtwork';
 import { ARTWORK_PATHS, getAmbientBackdrop } from './data/artworkAssets';
 
-const STORAGE_KEY = 'pecados_de_la_carne_save_v1';
-
-const DEFAULT_CONSENT: ConsentDocument = {
-  baseLevel: 0,
-  acceptEncantos: true,
-  acceptArrebato: true,
-  acceptDrenaje: true,
-  acceptMarcado: true,
-  acceptTentacion: true,
-  useEndurecimiento: false,
-  hardLimits: [
-    'Coacción sexual no consentida',
-    'Daño gráfico extremo o gore sexual',
-    'Implicación de menores',
-  ],
-  amberWord: 'Ámbar',
-  xCardWord: 'Tarjeta X',
-  aftercarePreference: 'Resumen breve en calma al concluir la escena.',
-};
+const AGE_GATE_KEY = 'pecados_age_gate_v1';
 
 interface ArcHandout {
   code: string;
@@ -138,108 +101,154 @@ function getArcProgressSteps(
   return { steps, activeIndex };
 }
 
-interface SavedSession {
-  investigator: Investigator;
-  consent: ConsentDocument;
-  narrativeLevel: NarrativeLevel;
-  currentArcId: string;
-  currentNodeId: string;
-  flags: string[];
-  chronicle: ChronicleLog[];
-}
-
 export default function App() {
-  const [gameState, setGameState] = useState<GameState>('TITLE_MENU');
-  const [consent, setConsent] = useState<ConsentDocument>(DEFAULT_CONSENT);
-  const [narrativeLevel, setNarrativeLevel] = useState<NarrativeLevel>(0);
-  const [investigator, setInvestigator] = useState<Investigator>(() =>
-    JSON.parse(JSON.stringify(INVESTIGATORS[0]))
-  );
-  const [currentArcId, setCurrentArcId] = useState<string>(STORY_ARCS[0].id);
-  const [currentNodeId, setCurrentNodeId] = useState<string>(
-    STORY_ARCS[0].startNodeId
-  );
-  const [flags, setFlags] = useState<string[]>([]);
-  const [chronicle, setChronicle] = useState<ChronicleLog[]>([]);
-  const [lastRoll, setLastRoll] = useState<DiceRollResult | null>(null);
-  const [isRolling, setIsRolling] = useState(false);
-  const [sheetDifficulty, setSheetDifficulty] = useState<DifficultyLevel>('NORMAL');
-  const [sheetBonusPenalty, setSheetBonusPenalty] = useState<number>(0);
-  const [quickPolyNote, setQuickPolyNote] = useState<string | null>(null);
-  const [handoutOpen, setHandoutOpen] = useState<boolean>(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-
-  // Outcome transition banner between choices
-  const [pendingOutcome, setPendingOutcome] = useState<{
-    text: string;
-    nextNodeId: string;
-    triggerCombatEntityId?: string;
-    succeeded?: boolean;
-  } | null>(null);
-
-  // Active combat target
-  const [combatEntity, setCombatEntity] = useState<BestiaryEntity | null>(null);
-  const [combatReturnNodeId, setCombatReturnNodeId] = useState<string | null>(
-    null
-  );
-
-  // Safety & Threshold Modals
-  const [xCardOpen, setXCardOpen] = useState(false);
-  const [amberNotice, setAmberNotice] = useState<string | null>(null);
-  const [thresholdModal, setThresholdModal] = useState<{
-    title: string;
-    lines: string[];
-  } | null>(null);
-
-  // Saved game check on mount
-  const [hasSavedGame, setHasSavedGame] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as SavedSession;
-        if (parsed && parsed.investigator && parsed.currentNodeId) {
-          setHasSavedGame(true);
-        }
-      }
-    } catch {
-      // ignore invalid storage
-    }
-  }, []);
-
-  // Persist active game state cleanly
-  useEffect(() => {
-    if (gameState === 'PLAYING' || gameState === 'COMBAT_INTIMO') {
-      try {
-        const payload: SavedSession = {
-          investigator,
-          consent,
-          narrativeLevel,
-          currentArcId,
-          currentNodeId,
-          flags,
-          chronicle: chronicle.slice(0, 40),
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-        setHasSavedGame(true);
-      } catch {
-        // ignore quota errors
-      }
-    }
-  }, [
+  const session = useGameSession();
+  const {
     gameState,
-    investigator,
+    setGameState,
     consent,
     narrativeLevel,
+    investigator,
+    setInvestigator,
     currentArcId,
-    currentNodeId,
+    currentArc,
+    currentNode,
+    sceneHistory,
     flags,
     chronicle,
+    lastRoll,
+    isRolling,
+    sheetDifficulty,
+    setSheetDifficulty,
+    sheetBonusPenalty,
+    setSheetBonusPenalty,
+    quickPolyNote,
+    soundEnabled,
+    pendingOutcome,
+    combatEntity,
+    activeCombatSnapshot,
+    setActiveCombatSnapshot,
+    xCardOpen,
+    setXCardOpen,
+    amberNotice,
+    setAmberNotice,
+    thresholdModal,
+    setThresholdModal,
+    hasSavedGame,
+    appendChronicle,
+    handleToggleSound,
+    handleResumeSaved,
+    handleConfirmSessionZero,
+    handleChangeLevel,
+    handleTriggerAmber,
+    handleTriggerXCard,
+    handleXCardAction,
+    triggerRollAnim,
+    handleManualSkillRoll,
+    handleQuickPolyRoll,
+    getSkillValue,
+    handleSelectChoice,
+    handleProceedPendingOutcome,
+    handleCombatComplete,
+    handleUseLazo,
+    handleRecover,
+    handleSaveDiario,
+    handleCastSpell,
+    handleUseRelic,
+    handleTablaERatification,
+    handleStartFreeCombat,
+    handleExportSession,
+    handleImportSession,
+  } = session;
+
+  const [handoutOpen, setHandoutOpen] = useState(false);
+  const [sessionZeroSeeds, setSessionZeroSeeds] = useState<{
+    investigatorId: string;
+    arcId: string;
+  } | null>(null);
+  const [quickStartPending, setQuickStartPending] = useState<{
+    inv: Investigator;
+    arc: StoryArc;
+  } | null>(null);
+
+  const [ageConfirmed, setAgeConfirmed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AGE_GATE_KEY) === 'confirmed';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleConfirmAgeGate = () => {
+    try {
+      localStorage.setItem(AGE_GATE_KEY, 'confirmed');
+    } catch {
+      // ignore storage failure
+    }
+    setAgeConfirmed(true);
+  };
+
+  // Global keyboard shortcuts: X triggers Tarjeta X during play; Escape closes open modals
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName?.toLowerCase();
+      const isEditable =
+        tag === 'input' ||
+        tag === 'textarea' ||
+        tag === 'select' ||
+        Boolean(target?.isContentEditable);
+
+      if (e.key === 'Escape') {
+        if (xCardOpen) {
+          setXCardOpen(false);
+          return;
+        }
+        if (quickStartPending) {
+          setQuickStartPending(null);
+          return;
+        }
+        if (thresholdModal && !thresholdModal.reachedZero) {
+          setThresholdModal(null);
+          return;
+        }
+      }
+
+      if (
+        !isEditable &&
+        ageConfirmed &&
+        (e.key === 'x' || e.key === 'X') &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        (gameState === 'PLAYING' || gameState === 'COMBAT_INTIMO')
+      ) {
+        e.preventDefault();
+        handleTriggerXCard();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [
+    ageConfirmed,
+    gameState,
+    xCardOpen,
+    quickStartPending,
+    thresholdModal,
+    setXCardOpen,
+    setThresholdModal,
+    handleTriggerXCard,
   ]);
 
-  const currentNode = STORY_NODES[currentNodeId] || STORY_NODES.zarza_intro;
-  const currentArc =
-    STORY_ARCS.find((a) => a.id === currentArcId) || STORY_ARCS[0];
+  const openSessionZero = (invId = investigator.id, arcId = currentArcId) => {
+    setSessionZeroSeeds({ investigatorId: invId, arcId });
+    setGameState('SESSION_ZERO');
+  };
+
+  const handleRequestQuickStart = (inv: Investigator, arc: StoryArc) => {
+    const cloned: Investigator = JSON.parse(JSON.stringify(inv));
+    setQuickStartPending({ inv: cloned, arc });
+  };
 
   const corruptionRatio =
     gameState === 'PLAYING' || gameState === 'COMBAT_INTIMO'
@@ -252,543 +261,6 @@ export default function App() {
           )
         )
       : 0.18;
-
-  const appendChronicle = (
-    type: ChronicleLog['type'],
-    title: string,
-    detail: string
-  ) => {
-    const now = new Date();
-    const timestamp = now.toLocaleTimeString('es-ES', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    setChronicle((prev) => [
-      {
-        id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        type,
-        title,
-        detail,
-        timestamp,
-      },
-      ...prev.slice(0, 49),
-    ]);
-  };
-
-  const handleToggleSound = () => {
-    const next = !soundEnabled;
-    soundEngine.enabled = next;
-    setSoundEnabled(next);
-  };
-
-  const handleResumeSaved = () => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as SavedSession;
-      setInvestigator(saved.investigator);
-      setConsent(saved.consent);
-      setNarrativeLevel(saved.narrativeLevel);
-      setCurrentArcId(saved.currentArcId);
-      setCurrentNodeId(saved.currentNodeId);
-      setFlags(saved.flags || []);
-      setChronicle(saved.chronicle || []);
-      setPendingOutcome(null);
-      setCombatEntity(null);
-      setGameState('PLAYING');
-    } catch {
-      setGameState('SESSION_ZERO');
-    }
-  };
-
-  const handleConfirmSessionZero = (
-    newConsent: ConsentDocument,
-    chosenInv: Investigator,
-    chosenArc: StoryArc
-  ) => {
-    setConsent(newConsent);
-    setNarrativeLevel(newConsent.baseLevel);
-    setInvestigator(chosenInv);
-    setCurrentArcId(chosenArc.id);
-    setCurrentNodeId(chosenArc.startNodeId);
-    setFlags([]);
-    setPendingOutcome(null);
-    setCombatEntity(null);
-    setLastRoll(null);
-    setQuickPolyNote(null);
-    setHandoutOpen(false);
-    setChronicle([
-      {
-        id: `init-${Date.now()}`,
-        type: 'SAFETY',
-        title: 'Sesión Cero sellada',
-        detail: `Investigador: ${chosenInv.name}. Arco: ${chosenArc.title}. Escala máxima: Nivel ${newConsent.baseLevel} (${newConsent.baseLevel === 0 ? 'Velo estricto' : 'Sensual'}).`,
-        timestamp: new Date().toLocaleTimeString('es-ES', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-      },
-    ]);
-    soundEngine.playSafetyChime();
-    setGameState('PLAYING');
-  };
-
-  const handleQuickStartArc = (arc: StoryArc) => {
-    // Starts directly with default Elena or current investigator in Velo mode after clean clone
-    const cloned: Investigator = JSON.parse(JSON.stringify(INVESTIGATORS[0]));
-    handleConfirmSessionZero(DEFAULT_CONSENT, cloned, arc);
-  };
-
-  const handleChangeLevel = (lvl: NarrativeLevel) => {
-    if (lvl <= consent.baseLevel || lvl === 0) {
-      setNarrativeLevel(lvl);
-      appendChronicle(
-        'SAFETY',
-        'Escala narrativa ajustada',
-        `Nivel cambiado a ${lvl === 0 ? 'Nivel 0 (Velo estricto)' : 'Nivel 1 (Sensual literario)'}.`
-      );
-    }
-  };
-
-  const handleTriggerAmber = () => {
-    soundEngine.playSafetyChime();
-    setNarrativeLevel(0);
-    setAmberNotice(
-      `Señal «${consent.amberWord}» activada: la narración ha pasado inmediatamente a Nivel 0 (Velo estricto) sin alterar la partida.`
-    );
-    appendChronicle(
-      'SAFETY',
-      `Señal Ámbar (${consent.amberWord})`,
-      'Tono suavizado a Nivel 0 (Velo estricto).'
-    );
-    setTimeout(() => setAmberNotice(null), 5000);
-  };
-
-  const handleTriggerXCard = () => {
-    soundEngine.playSafetyChime();
-    setXCardOpen(true);
-  };
-
-  const handleXCardSkipScene = () => {
-    setNarrativeLevel(0);
-    setXCardOpen(false);
-    if (gameState === 'COMBAT_INTIMO') {
-      const returnId = combatReturnNodeId || currentNodeId;
-      setCombatEntity(null);
-      setCombatReturnNodeId(null);
-      setCurrentNodeId(returnId);
-      setGameState('PLAYING');
-    } else if (currentNode.choices.length > 0) {
-      const firstChoice = currentNode.choices[0];
-      const nextId =
-        firstChoice.directOutcome?.nextSceneId ||
-        firstChoice.skillCheck?.onSuccess.nextSceneId ||
-        currentNodeId;
-      setPendingOutcome(null);
-      setCurrentNodeId(nextId);
-    }
-    appendChronicle(
-      'SAFETY',
-      `Tarjeta X (${consent.xCardWord})`,
-      'Escena omitida limpiamente con retorno seguro a Nivel 0 (sin coste mecánico).'
-    );
-  };
-
-  const triggerRollAnim = (roll: DiceRollResult) => {
-    setIsRolling(true);
-    setLastRoll(roll);
-    setTimeout(() => setIsRolling(false), 180);
-  };
-
-  const handleManualSkillRoll = (label: string, target: number) => {
-    soundEngine.playDiceRoll();
-    setQuickPolyNote(null);
-    const result = rollD100(label, target, sheetDifficulty, sheetBonusPenalty);
-    triggerRollAnim(result);
-    if (result.isSuccess) {
-      soundEngine.playSuccess(
-        result.degree === 'EXTREMO' || result.degree === 'CRITICO'
-      );
-    }
-    appendChronicle(
-      'ROLL',
-      `${label}: ${result.rawRoll} (${result.degree})`,
-      `Objetivo ≤ ${result.effectiveTarget}% (${sheetDifficulty}${
-        sheetBonusPenalty !== 0
-          ? `, ${sheetBonusPenalty > 0 ? '+1D Bon.' : '-1D Pen.'}`
-          : ''
-      }).`
-    );
-  };
-
-  const handleQuickPolyRoll = (sides: number | 'D100') => {
-    soundEngine.playDiceRoll();
-    if (sides === 'D100') {
-      setQuickPolyNote(null);
-      const result = rollD100(
-        'Tirada D100 abierta',
-        50,
-        sheetDifficulty,
-        sheetBonusPenalty
-      );
-      triggerRollAnim(result);
-      if (result.isSuccess) {
-        soundEngine.playSuccess(
-          result.degree === 'EXTREMO' || result.degree === 'CRITICO'
-        );
-      }
-      appendChronicle(
-        'ROLL',
-        `D100 abierta: ${result.rawRoll} (${result.degree})`,
-        `Referencia 50% · Objetivo ≤ ${result.effectiveTarget}%.`
-      );
-      return;
-    }
-    const val = rollDie(sides);
-    setQuickPolyNote(`1D${sides} libre = ${val}`);
-    appendChronicle(
-      'ROLL',
-      `Tirada 1D${sides}: ${val}`,
-      'Dado poliédrico directo desde la bandeja de mesa.'
-    );
-  };
-
-  const applyOutcomeEffects = (
-    outcome: SceneOutcome,
-    sourceLabel: string,
-    succeeded?: boolean
-  ) => {
-    let nextInv: Investigator = { ...investigator };
-
-    if (outcome.corLoss) {
-      const cRoll = rollDiceNotation(outcome.corLoss);
-      if (cRoll.total > 0) {
-        nextInv.cor = Math.max(0, nextInv.cor - cRoll.total);
-        appendChronicle(
-          'CORRUPTION',
-          `Cordura -${cRoll.total}`,
-          `${sourceLabel}: ${cRoll.detail}. COR restante: ${nextInv.cor}.`
-        );
-      }
-    }
-
-    if (outcome.inhLoss) {
-      const iRoll = rollDiceNotation(outcome.inhLoss);
-      if (iRoll.total > 0) {
-        const res = applyInhibitionLoss(nextInv, iRoll.total, sourceLabel);
-        nextInv = res.updatedInvestigator;
-        appendChronicle(
-          'CORRUPTION',
-          `Inhibición -${res.lossAmount}`,
-          `INH restante: ${nextInv.inh}. ${res.notes.join(' ')}`
-        );
-        if (
-          res.triggeredArrebato ||
-          res.newThresholdFilias.length > 0 ||
-          res.crossedTenWarning ||
-          res.reachedZero
-        ) {
-          soundEngine.playCorruption();
-          setThresholdModal({
-            title: res.reachedZero
-              ? 'Umbral 0 · La Caída Consumada'
-              : res.triggeredArrebato
-                ? 'Arrebato de Lujuria (Tabla A)'
-                : 'Umbral de Inhibición Cruzado',
-            lines: res.notes,
-          });
-        }
-      }
-    }
-
-    if (typeof outcome.acDelta === 'number') {
-      nextInv.ac = Math.max(
-        0,
-        Math.min(nextInv.maxAc, nextInv.ac + outcome.acDelta)
-      );
-    }
-    if (typeof outcome.pvDelta === 'number') {
-      nextInv.pv = Math.max(
-        0,
-        Math.min(nextInv.maxPv, nextInv.pv + outcome.pvDelta)
-      );
-    }
-    if (typeof outcome.pmDelta === 'number') {
-      nextInv.pm = Math.max(
-        0,
-        Math.min(nextInv.maxPm, nextInv.pm + outcome.pmDelta)
-      );
-    }
-    if (outcome.addMarca && !nextInv.marcas.includes(outcome.addMarca)) {
-      nextInv.marcas = [...nextInv.marcas, outcome.addMarca];
-    }
-    if (outcome.addDeuda && !nextInv.deudas.includes(outcome.addDeuda)) {
-      nextInv.deudas = [...nextInv.deudas, outcome.addDeuda];
-    }
-    if (outcome.addRelic && !nextInv.reliquias.includes(outcome.addRelic)) {
-      nextInv.reliquias = [...nextInv.reliquias, outcome.addRelic];
-    }
-    if (outcome.addSpell && !nextInv.hechizos.includes(outcome.addSpell)) {
-      nextInv.hechizos = [...nextInv.hechizos, outcome.addSpell];
-    }
-    if (outcome.addFlag && !flags.includes(outcome.addFlag)) {
-      setFlags((prev) => [...prev, outcome.addFlag as string]);
-    }
-
-    setInvestigator(nextInv);
-
-    const prose =
-      narrativeLevel === 0
-        ? outcome.narrativeVelo
-        : outcome.narrativeSensual;
-
-    setPendingOutcome({
-      text: prose,
-      nextNodeId: outcome.nextSceneId,
-      triggerCombatEntityId: outcome.triggerCombatEntityId,
-      succeeded,
-    });
-  };
-
-  const getSkillValue = (
-    key: NonNullable<SceneChoice['skillCheck']>['skill']
-  ): number => {
-    if (key === 'CON') return investigator.attributes.CON;
-    if (key === 'POD') return investigator.attributes.POD;
-    if (key === 'INT') return investigator.attributes.INT;
-    if (key === 'COR') return investigator.cor;
-    if (key === 'INH') return investigator.inh;
-    return investigator.skills[key];
-  };
-
-  const handleSelectChoice = (choice: SceneChoice) => {
-    if (choice.costsPm && investigator.pm < choice.costsPm) return;
-
-    if (choice.costsPm) {
-      setInvestigator((inv) => ({
-        ...inv,
-        pm: Math.max(0, inv.pm - (choice.costsPm || 0)),
-      }));
-    }
-
-    if (choice.skillCheck) {
-      soundEngine.playDiceRoll();
-      const target = getSkillValue(choice.skillCheck.skill);
-      const result = rollD100(
-        choice.skillCheck.label,
-        target,
-        choice.skillCheck.difficulty,
-        0
-      );
-      triggerRollAnim(result);
-
-      if (result.isSuccess) {
-        soundEngine.playSuccess(
-          result.degree === 'EXTREMO' || result.degree === 'CRITICO'
-        );
-        appendChronicle(
-          'ROLL',
-          `Éxito (${result.rawRoll} · ${result.degree})`,
-          choice.skillCheck.label
-        );
-        applyOutcomeEffects(
-          choice.skillCheck.onSuccess,
-          choice.skillCheck.label,
-          true
-        );
-      } else {
-        soundEngine.playCorruption();
-        appendChronicle(
-          'ROLL',
-          `Fallo (${result.rawRoll} · ${result.degree})`,
-          choice.skillCheck.label
-        );
-        applyOutcomeEffects(
-          choice.skillCheck.onFail,
-          choice.skillCheck.label,
-          false
-        );
-      }
-      return;
-    }
-
-    if (choice.directOutcome) {
-      applyOutcomeEffects(choice.directOutcome, choice.label);
-    }
-  };
-
-  const handleProceedPendingOutcome = () => {
-    if (!pendingOutcome) return;
-    if (pendingOutcome.triggerCombatEntityId) {
-      const ent = BESTIARY_ENTITIES.find(
-        (e) => e.id === pendingOutcome.triggerCombatEntityId
-      );
-      if (ent) {
-        setCombatEntity(JSON.parse(JSON.stringify(ent)));
-        setCombatReturnNodeId(pendingOutcome.nextNodeId);
-        setPendingOutcome(null);
-        setGameState('COMBAT_INTIMO');
-        return;
-      }
-    }
-    setCurrentNodeId(pendingOutcome.nextNodeId);
-    setPendingOutcome(null);
-  };
-
-  const handleCombatComplete = (outcome: 'VICTORY' | 'DEFEAT' | 'ESCAPED') => {
-    const targetNode = combatReturnNodeId || currentNodeId;
-    appendChronicle(
-      'COMBAT',
-      'Combate Íntimo concluido',
-      outcome === 'VICTORY'
-        ? 'Saliste victorioso del intercambio.'
-        : outcome === 'ESCAPED'
-          ? 'Rompiste el encuentro con Resistencia de Hierro.'
-          : 'Sobreviviste al clímax de la entidad.'
-    );
-    // Restore partial AC on recovery transition, clear round penalties
-    setInvestigator((inv) => ({
-      ...inv,
-      accumulatedCombatPenalty: 0,
-      arrebatoRounds: 0,
-      ac: Math.max(2, inv.ac),
-    }));
-    setCombatEntity(null);
-    setCombatReturnNodeId(null);
-    setCurrentNodeId(targetNode);
-    setGameState('PLAYING');
-  };
-
-  const handleUseLazo = (lazoId: string, mode: 'REFUGIO' | 'INHIBICION') => {
-    setInvestigator((prev) => {
-      const targetLazo = prev.lazos.find((l) => l.id === lazoId);
-      if (!targetLazo || targetLazo.spent) return prev;
-
-      if (mode === 'REFUGIO' && !targetLazo.refugeUsedThisSession) {
-        const corGain = rollDiceNotation('1d3').total;
-        const acGain = rollDiceNotation('1d3').total;
-        soundEngine.playSafetyChime();
-        appendChronicle(
-          'NARRATIVE',
-          `Refugio del Cuerpo (${targetLazo.name})`,
-          `Recuperas +${corGain} COR y +${acGain} AC.`
-        );
-        return {
-          ...prev,
-          cor: Math.min(prev.maxCor, prev.cor + corGain),
-          ac: Math.min(prev.maxAc, prev.ac + acGain),
-          lazos: prev.lazos.map((l) =>
-            l.id === lazoId ? { ...l, refugeUsedThisSession: true } : l
-          ),
-        };
-      }
-
-      if (mode === 'INHIBICION') {
-        soundEngine.playSafetyChime();
-        appendChronicle(
-          'CORRUPTION',
-          `Lazo Íntimo gastado (${targetLazo.name})`,
-          `Consolidas +6 puntos de Inhibición al aferrarte a tu vínculo.`
-        );
-        return {
-          ...prev,
-          inh: Math.min(prev.initialInh, prev.inh + 6),
-          lazos: prev.lazos.map((l) =>
-            l.id === lazoId ? { ...l, spent: true } : l
-          ),
-        };
-      }
-
-      return prev;
-    });
-  };
-
-  const handleSaveDiario = (entry: DiarioEntry) => {
-    setInvestigator((prev) => {
-      const next = {
-        ...prev,
-        diarioEntries: [entry, ...prev.diarioEntries],
-        diarioBonusUsed: true,
-      };
-      if (!prev.diarioBonusUsed) {
-        if (entry.bonusClaimed === 'AC') {
-          next.ac = Math.min(prev.maxAc, prev.ac + 1);
-        } else if (entry.bonusClaimed === 'SKILL') {
-          next.cor = Math.min(prev.maxCor, prev.cor + 1);
-        }
-      }
-      return next;
-    });
-    soundEngine.playSafetyChime();
-    appendChronicle(
-      'NARRATIVE',
-      'Diario de la Caída actualizado',
-      `${entry.scene} — ${entry.sharedPhrase}`
-    );
-  };
-
-  const handleCastSpell = (spellId: string) => {
-    const spell = GRIMORIO_SPELLS.find((s) => s.id === spellId);
-    if (!spell || investigator.pm < spell.pmCost) return;
-    soundEngine.playCorruption();
-    let nextInv: Investigator = {
-      ...investigator,
-      pm: Math.max(0, investigator.pm - spell.pmCost),
-    };
-    if (spell.inhCost > 0) {
-      const res = applyInhibitionLoss(
-        nextInv,
-        spell.inhCost,
-        `Hechizo: ${spell.name}`
-      );
-      nextInv = res.updatedInvestigator;
-    }
-    setInvestigator(nextInv);
-    appendChronicle(
-      'ROLL',
-      `Sortilegio lanzado: ${spell.name}`,
-      `${spell.effect} (Coste: ${spell.cost}).`
-    );
-  };
-
-  const handleUseRelic = (relicName: string) => {
-    const low = relicName.toLowerCase();
-    let msg = `Activas ${relicName} en escena.`;
-    setInvestigator((prev) => {
-      const next = { ...prev };
-      if (low.includes('lágrima') || low.includes('lagrima')) {
-        const pvHeal = rollDiceNotation('1d6').total;
-        const corHeal = rollDiceNotation('1d6').total;
-        next.pv = Math.min(next.maxPv, next.pv + pvHeal);
-        next.cor = Math.min(next.maxCor, next.cor + corHeal);
-        msg = `Lágrima de la Ninfa: recuperas +${pvHeal} PV y +${corHeal} COR.`;
-      } else if (low.includes('aceite')) {
-        next.ac = Math.min(next.maxAc, next.ac + 2);
-        const res = applyInhibitionLoss(next, 1, 'Aceite de la Zarza');
-        Object.assign(next, res.updatedInvestigator);
-        msg = `Aceite de la Zarza: +2 AC y protección contra zarcillos (-1 INH).`;
-      } else if (low.includes('sal marina')) {
-        next.cor = Math.min(next.maxCor, next.cor + 1);
-        msg = `Sal marina dispersada: el olor costero disipa la ilusión (+1 COR).`;
-      } else {
-        const { entry } = pickFromD100Table(TABLA_B);
-        msg = `${relicName} responde al umbral (eco de Tabla B: ${entry.name}).`;
-      }
-      return next;
-    });
-    soundEngine.playSuccess(false);
-    appendChronicle('NARRATIVE', `Reliquia: ${relicName}`, msg);
-  };
-
-  const handleStartFreeCombat = (entity: BestiaryEntity) => {
-    const clonedInv: Investigator = JSON.parse(
-      JSON.stringify(investigator || INVESTIGATORS[0])
-    );
-    setInvestigator(clonedInv);
-    setCombatEntity(JSON.parse(JSON.stringify(entity)));
-    setCombatReturnNodeId(currentNodeId);
-    setGameState('COMBAT_INTIMO');
-  };
 
   return (
     <div className="min-h-screen relative bg-[#09080c] text-[#ece3d5] flex flex-col selection:bg-[#9e1b32] selection:text-[#ece3d5]">
@@ -808,7 +280,7 @@ export default function App() {
           onTriggerXCard={handleTriggerXCard}
           onTriggerAmber={handleTriggerAmber}
           onNavigate={setGameState}
-          onStartSessionZero={() => setGameState('SESSION_ZERO')}
+          onStartSessionZero={() => openSessionZero()}
           onResetToMenu={() => setGameState('TITLE_MENU')}
           amberWord={consent.amberWord}
           xCardWord={consent.xCardWord}
@@ -875,7 +347,7 @@ export default function App() {
                   <div className="flex flex-wrap items-center gap-3 pt-1">
                     <button
                       type="button"
-                      onClick={() => setGameState('SESSION_ZERO')}
+                      onClick={() => openSessionZero()}
                       className="px-6 py-3 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] font-semibold text-sm sm:text-base flex items-center gap-2 border border-[#d43750]/50 shadow-xl transition-colors"
                     >
                       <Sparkles className="w-4 h-4 text-[#e5be6e]" />
@@ -903,11 +375,11 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* System Pillars (plain inline text with middots, zero pills) */}
+                  {/* System Pillars */}
                   <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#b5a998]">
                     <span className="flex items-center gap-1.5">
                       <ShieldCheck className="w-3.5 h-3.5 text-[#6ad1cc]" />
-                      Velo estricto / Sensual · Tarjeta X
+                      Velo estricto / Sensual · Tarjeta X (tecla X)
                     </span>
                     <span aria-hidden="true">·</span>
                     <span className="flex items-center gap-1.5">
@@ -917,7 +389,7 @@ export default function App() {
                     <span aria-hidden="true">·</span>
                     <span className="flex items-center gap-1.5">
                       <Swords className="w-3.5 h-3.5 text-[#e07a8a]" />
-                      3 arcos jugables + Duelo libre
+                      3 arcos jugables + Guardián y Oráculo IA
                     </span>
                   </div>
                 </div>
@@ -948,7 +420,7 @@ export default function App() {
                     Arcos Narrativos Jugables
                   </h2>
                   <p className="text-sm text-[#b5a998]">
-                    Elige un escenario directamente con Elena en Nivel 0 (Velo) o
+                    Inicia un escenario revisando el pacto de Velo en un clic o
                     configura tu mesa en Sesión Cero.
                   </p>
                 </div>
@@ -983,8 +455,10 @@ export default function App() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleQuickStartArc(arc)}
-                          className="px-3.5 py-2 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap"
+                          onClick={() =>
+                            handleRequestQuickStart(INVESTIGATORS[0], arc)
+                          }
+                          className="px-3.5 py-2 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
                         >
                           <span>Jugar ahora</span>
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -1004,7 +478,7 @@ export default function App() {
                 </h2>
                 <button
                   type="button"
-                  onClick={() => setGameState('SESSION_ZERO')}
+                  onClick={() => openSessionZero()}
                   className="text-xs text-[#e5be6e] hover:underline"
                 >
                   Personalizar en Sesión Cero →
@@ -1015,17 +489,12 @@ export default function App() {
                   <button
                     key={inv.id}
                     type="button"
-                    onClick={() => {
-                      const cloned: Investigator = JSON.parse(JSON.stringify(inv));
-                      handleConfirmSessionZero(
-                        DEFAULT_CONSENT,
-                        cloned,
-                        STORY_ARCS[0]
-                      );
-                    }}
+                    onClick={() =>
+                      handleRequestQuickStart(inv, STORY_ARCS[0])
+                    }
                     className="p-3 rounded-xl border border-[rgba(216,198,174,0.12)] bg-[#120f17]/85 hover:border-[#c59b4e]/60 text-center transition-all group"
                   >
-                    <div className="w-14 h-14 mx-auto mb-2">
+                    <div className="w-full aspect-square mb-2.5 overflow-hidden rounded-xl transition-transform duration-300 group-hover:scale-[1.03]">
                       <InvestigatorCrest
                         portraitKey={inv.portraitKey}
                         name={inv.name}
@@ -1034,7 +503,7 @@ export default function App() {
                     <div className="font-serif-display text-base font-semibold text-[#ece3d5] group-hover:text-[#e5be6e]">
                       {inv.name}
                     </div>
-                    <div className="text-[11px] text-[#7c7166] font-mono-tabular">
+                    <div className="text-[11px] text-[#9b8f82] font-mono-tabular">
                       INH {inv.initialInh} · AC {inv.ac}
                     </div>
                   </button>
@@ -1048,8 +517,10 @@ export default function App() {
         {gameState === 'SESSION_ZERO' && (
           <SessionZeroModal
             initialConsent={consent}
-            initialInvestigatorId={investigator.id}
-            initialArcId={currentArcId}
+            initialInvestigatorId={
+              sessionZeroSeeds?.investigatorId || investigator.id
+            }
+            initialArcId={sessionZeroSeeds?.arcId || currentArcId}
             onConfirm={handleConfirmSessionZero}
             onCancel={() => setGameState('TITLE_MENU')}
           />
@@ -1059,7 +530,7 @@ export default function App() {
         {gameState === 'COMPENDIUM' && (
           <CompendiumView
             onStartFreeCombat={handleStartFreeCombat}
-            onStartSessionZero={() => setGameState('SESSION_ZERO')}
+            onStartSessionZero={() => openSessionZero()}
           />
         )}
 
@@ -1073,6 +544,7 @@ export default function App() {
                 useEndurecimiento={consent.useEndurecimiento}
                 onRollSkill={handleManualSkillRoll}
                 onUseLazo={handleUseLazo}
+                onRecover={handleRecover}
               />
             </div>
 
@@ -1094,13 +566,17 @@ export default function App() {
                   investigator={investigator}
                   entity={combatEntity}
                   narrativeLevel={narrativeLevel}
+                  acceptDrenaje={consent.acceptDrenaje}
+                  acceptArrebato={consent.acceptArrebato}
+                  initialSnapshot={activeCombatSnapshot}
+                  onSnapshotChange={setActiveCombatSnapshot}
                   onUpdateInvestigator={setInvestigator}
                   onRollRecorded={triggerRollAnim}
                   onLog={(type, title, detail) =>
                     appendChronicle(type, title, detail)
                   }
-                  onTriggerThresholdModal={(title, lines) =>
-                    setThresholdModal({ title, lines })
+                  onTriggerThresholdModal={(title, lines, reachedZero) =>
+                    setThresholdModal({ title, lines, reachedZero })
                   }
                   onCombatComplete={handleCombatComplete}
                   onTriggerXCard={handleTriggerXCard}
@@ -1124,7 +600,7 @@ export default function App() {
                                 {idx > 0 && (
                                   <span
                                     aria-hidden="true"
-                                    className="text-[#4a423b]"
+                                    className="text-[#5a5047]"
                                   >
                                     —
                                   </span>
@@ -1135,7 +611,7 @@ export default function App() {
                                       ? 'text-[#e5be6e] font-semibold underline decoration-[#c59b4e]/60 underline-offset-4'
                                       : idx < activeIndex
                                         ? 'text-[#6ad1cc]'
-                                        : 'text-[#6d6258]'
+                                        : 'text-[#9b8f82]'
                                   }
                                 >
                                   {step}
@@ -1170,7 +646,7 @@ export default function App() {
                               <span className="font-mono-tabular text-[10px] uppercase tracking-widest text-[#e5be6e]">
                                 {handout.code}
                               </span>
-                              <span className="text-[11px] text-[#9b8e7e] italic">
+                              <span className="text-[11px] text-[#b5a998] italic">
                                 {handout.material}
                               </span>
                             </div>
@@ -1247,7 +723,7 @@ export default function App() {
                         key={index}
                         className="text-base sm:text-[17px] leading-[1.72] text-[#ece3d5]/95"
                       >
-                        {paragraph}
+                        {filterByHardLimits(paragraph, consent.hardLimits).text}
                       </p>
                     ))}
 
@@ -1308,7 +784,7 @@ export default function App() {
                         )}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono-tabular text-xs pt-1">
                           <div className="p-2.5 rounded bg-[#09080c] border border-[rgba(216,198,174,0.14)]">
-                            <div className="text-[10px] text-[#7c7166]">
+                            <div className="text-[10px] text-[#9b8f82]">
                               Cordura final
                             </div>
                             <div className="text-[#6ad1cc] font-semibold">
@@ -1316,7 +792,7 @@ export default function App() {
                             </div>
                           </div>
                           <div className="p-2.5 rounded bg-[#09080c] border border-[rgba(216,198,174,0.14)]">
-                            <div className="text-[10px] text-[#7c7166]">
+                            <div className="text-[10px] text-[#9b8f82]">
                               Inhibición final
                             </div>
                             <div className="text-[#e07a8a] font-semibold">
@@ -1324,7 +800,7 @@ export default function App() {
                             </div>
                           </div>
                           <div className="p-2.5 rounded bg-[#09080c] border border-[rgba(216,198,174,0.14)]">
-                            <div className="text-[10px] text-[#7c7166]">
+                            <div className="text-[10px] text-[#9b8f82]">
                               Filias activas
                             </div>
                             <div className="text-[#e5be6e] font-semibold">
@@ -1332,7 +808,7 @@ export default function App() {
                             </div>
                           </div>
                           <div className="p-2.5 rounded bg-[#09080c] border border-[rgba(216,198,174,0.14)]">
-                            <div className="text-[10px] text-[#7c7166]">
+                            <div className="text-[10px] text-[#9b8f82]">
                               Marcas
                             </div>
                             <div className="text-[#ece3d5] font-semibold">
@@ -1346,7 +822,7 @@ export default function App() {
                         <div className="flex flex-wrap gap-3 pt-1">
                           <button
                             type="button"
-                            onClick={() => setGameState('SESSION_ZERO')}
+                            onClick={() => openSessionZero()}
                             className="px-5 py-2.5 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] text-sm font-semibold inline-flex items-center gap-2"
                           >
                             <RotateCcw className="w-4 h-4" />
@@ -1364,7 +840,7 @@ export default function App() {
                     ) : (
                       /* Interactive Choices */
                       <div className="pt-3 border-t border-[rgba(216,198,174,0.12)] space-y-2.5">
-                        <div className="text-[11px] uppercase tracking-wider text-[#7c7166]">
+                        <div className="text-[11px] uppercase tracking-wider text-[#9b8f82]">
                           ¿Qué decides hacer?
                         </div>
                         {currentNode.choices.map((choice) => {
@@ -1399,11 +875,11 @@ export default function App() {
 
                               <div className="shrink-0 flex items-center gap-2">
                                 {choice.skillCheck && skillTarget !== null && (
-                                  <span className="font-mono-tabular text-xs text-[#c59b4e] bg-[#14111a] border border-[#c59b4e]/35 px-2 py-1 rounded">
+                                  <span className="font-mono-tabular text-xs text-[#c59b4e] bg-[#14111a] border border-[#c59b4e]/35 px-2 py-1 rounded whitespace-nowrap">
                                     {skillTarget}% · {choice.skillCheck.difficulty}
                                   </span>
                                 )}
-                                <ArrowRight className="w-4 h-4 text-[#7c7166] group-hover:text-[#e5be6e] transition-colors" />
+                                <ArrowRight className="w-4 h-4 text-[#9b8f82] group-hover:text-[#e5be6e] transition-colors" />
                               </div>
                             </button>
                           );
@@ -1421,15 +897,147 @@ export default function App() {
                 investigator={investigator}
                 chronicle={chronicle}
                 flags={flags}
+                narrativeLevel={narrativeLevel}
+                hardLimits={consent.hardLimits}
                 onSaveDiario={handleSaveDiario}
                 onCastSpell={handleCastSpell}
                 onUseRelic={handleUseRelic}
                 onLog={appendChronicle}
+                onExportSession={handleExportSession}
+                onImportSession={handleImportSession}
               />
             </div>
           </main>
         )}
       </div>
+
+      {/* ==================== 18+ CONTENT GATE MODAL ==================== */}
+      {!ageConfirmed && (
+        <div
+          className="fixed inset-0 z-50 bg-[#09080c]/95 backdrop-blur-md flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="age-gate-title"
+        >
+          <div className="max-w-lg w-full rounded-2xl border border-[#c59b4e]/60 bg-[#120f17] p-6 sm:p-7 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-lg bg-[#9e1b32]/25 border border-[#d43750]/50 flex items-center justify-center text-[#ff8fa0]">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h2
+                  id="age-gate-title"
+                  className="font-serif-display text-2xl font-semibold text-[#ece3d5]"
+                >
+                  Aviso de Contenido Adulto (+18)
+                </h2>
+                <p className="text-xs text-[#e5be6e]">
+                  Pecados de la Carne · Suplemento de Horror Cósmico
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-[#d6cbb9] leading-relaxed">
+              Esta aplicación interactiva adapta mecánicas de horror psicológico,
+              tensión erótico-cósmica y corrupción mental sobre el sistema BRP D100.
+              Por defecto opera bajo <strong className="text-[#ece3d5]">Nivel 0 (Velo estricto)</strong>{' '}
+              con <strong className="text-[#6ad1cc]">Tarjeta X (tecla X)</strong>,{' '}
+              <strong className="text-[#e5be6e]">Palabra Ámbar</strong> y un{' '}
+              <strong className="text-[#ece3d5]">veto universal permanente contra cualquier implicación de menores (Sección 1.3.1)</strong>.
+            </p>
+            <div className="p-3 rounded-lg bg-[#09080c] border border-[rgba(216,198,174,0.14)] text-xs text-[#b5a998] flex items-center gap-2">
+              <Lock className="w-4 h-4 text-[#6ad1cc] shrink-0" />
+              <span>
+                Contenido de ficción destinado exclusivamente a personas mayores de 18 años.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleConfirmAgeGate}
+              className="w-full py-3 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] font-semibold text-sm transition-colors"
+            >
+              Confirmo que soy mayor de 18 años y entrar a la mesa
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== QUICK-START CONSENT SUMMARY MODAL ==================== */}
+      {quickStartPending && (
+        <div
+          className="fixed inset-0 z-50 bg-[#09080c]/85 backdrop-blur-md flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quickstart-consent-title"
+        >
+          <div className="max-w-lg w-full rounded-2xl border border-[#2e7d7b]/65 bg-[#120f17] p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#2e7d7b]/25 border border-[#6ad1cc]/50 flex items-center justify-center text-[#6ad1cc]">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h2
+                  id="quickstart-consent-title"
+                  className="font-serif-display text-2xl font-semibold text-[#ece3d5]"
+                >
+                  Resumen de Consentimiento (Inicio Rápido)
+                </h2>
+                <p className="text-xs text-[#6ad1cc]">
+                  {quickStartPending.arc.title} · {quickStartPending.inv.name}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 text-xs text-[#d6cbb9] bg-[#09080c] border border-[rgba(216,198,174,0.14)] rounded-xl p-4">
+              <div>
+                <strong className="text-[#ece3d5]">Escala inicial:</strong>{' '}
+                Nivel {DEFAULT_CONSENT.baseLevel} (Velo estricto — elipsis elegante)
+              </div>
+              <div>
+                <strong className="text-[#ece3d5]">Seguridad en vivo:</strong>{' '}
+                Palabra «{DEFAULT_CONSENT.amberWord}» y Tarjeta X (tecla X) activas en todo momento
+              </div>
+              <div>
+                <strong className="text-[#ece3d5]">Límites duros sellados:</strong>{' '}
+                {DEFAULT_CONSENT.hardLimits.join(' · ')}
+              </div>
+              <div>
+                <strong className="text-[#ece3d5]">Cierre / Aftercare:</strong>{' '}
+                {DEFAULT_CONSENT.aftercarePreference}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const { inv, arc } = quickStartPending;
+                  setQuickStartPending(null);
+                  handleConfirmSessionZero(DEFAULT_CONSENT, inv, arc);
+                }}
+                className="flex-1 py-2.5 px-4 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] font-semibold text-sm transition-colors whitespace-nowrap"
+              >
+                Aceptar pacto y empezar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const { inv, arc } = quickStartPending;
+                  setQuickStartPending(null);
+                  openSessionZero(inv.id, arc.id);
+                }}
+                className="py-2.5 px-4 rounded-lg border border-[rgba(216,198,174,0.25)] hover:border-[#c59b4e] text-xs text-[#ece3d5] whitespace-nowrap"
+              >
+                Personalizar en Sesión Cero
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickStartPending(null)}
+                className="py-2.5 px-3 rounded-lg text-xs text-[#9b8f82] hover:text-[#ece3d5]"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==================== TARJETA X SAFE PAUSE MODAL ==================== */}
       {xCardOpen && (
@@ -1457,35 +1065,37 @@ export default function App() {
               </div>
             </div>
             <p className="text-sm text-[#b5a998] leading-relaxed">
-              Has detenido la escena con total legitimidad. Puedes saltarla por
-              completo bajo velo limpio, bajar la escala narrativa o volver al
-              menú cuando lo necesites.
+              Has detenido la escena con total legitimidad. Elige cómo quieres
+              continuar en un entorno seguro:
             </p>
             <div className="space-y-2 pt-2">
+              {(sceneHistory.length > 0 || gameState === 'COMBAT_INTIMO') && (
+                <button
+                  type="button"
+                  onClick={() => handleXCardAction('REWIND')}
+                  className="w-full py-2.5 px-4 rounded-lg bg-[#2e7d7b] hover:bg-[#389592] text-[#09080c] font-semibold text-sm transition-colors"
+                >
+                  Rebobinar a escena anterior segura (Nivel 0 Velo)
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleXCardSkipScene}
-                className="w-full py-2.5 px-4 rounded-lg bg-[#2e7d7b] hover:bg-[#389592] text-[#09080c] font-semibold text-sm transition-colors"
+                onClick={() => handleXCardAction('VEIL')}
+                className="w-full py-2.5 px-4 rounded-lg border border-[#6ad1cc]/50 bg-[#2e7d7b]/15 hover:bg-[#2e7d7b]/25 text-sm text-[#ece3d5] transition-colors"
               >
-                Saltar escena actual sin penalización (Nivel 0 Velo)
+                Velar esta escena en Nivel 0 (Velo estricto)
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setNarrativeLevel(0);
-                  setXCardOpen(false);
-                }}
-                className="w-full py-2.5 px-4 rounded-lg border border-[rgba(216,198,174,0.2)] text-sm text-[#ece3d5] hover:border-[#6ad1cc]"
+                onClick={() => handleXCardAction('SKIP')}
+                className="w-full py-2.5 px-4 rounded-lg border border-[rgba(216,198,174,0.2)] text-sm text-[#ece3d5] hover:border-[#6ad1cc] transition-colors"
               >
-                Continuar solo con Nivel 0 (Velo estricto)
+                Omitir escena actual y avanzar bajo Velo
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setXCardOpen(false);
-                  setGameState('TITLE_MENU');
-                }}
-                className="w-full py-2 px-4 rounded-lg text-xs text-[#7c7166] hover:text-[#ece3d5]"
+                onClick={() => handleXCardAction('EXIT')}
+                className="w-full py-2 px-4 rounded-lg text-xs text-[#9b8f82] hover:text-[#ece3d5]"
               >
                 Salir de la sesión al menú
               </button>
@@ -1494,7 +1104,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ==================== THRESHOLD / ARREBATO MODAL ==================== */}
+      {/* ==================== THRESHOLD / ARREBATO / TABLA E MODAL ==================== */}
       {thresholdModal && (
         <div
           className="fixed inset-0 z-50 bg-[#09080c]/85 backdrop-blur-md flex items-center justify-center p-4"
@@ -1511,7 +1121,7 @@ export default function App() {
             <h2 className="font-serif-display text-2xl sm:text-3xl font-semibold text-[#ece3d5]">
               {thresholdModal.title}
             </h2>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {thresholdModal.lines.map((line, i) => (
                 <p
                   key={i}
@@ -1521,13 +1131,76 @@ export default function App() {
                 </p>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setThresholdModal(null)}
-              className="w-full py-2.5 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] font-semibold text-sm transition-colors"
-            >
-              Aceptar transformación y continuar
-            </button>
+
+            {thresholdModal.reachedZero ? (
+              <div className="space-y-2.5 pt-2 border-t border-[rgba(216,198,174,0.14)]">
+                <div className="text-xs text-[#e5be6e] font-semibold">
+                  Ratificación y Co-escritura obligatoria (Secciones 3.5.2 y 17.7):
+                </div>
+                <p className="text-xs text-[#b5a998] leading-relaxed">
+                  Al alcanzar INH 0, ninguna entidad controla tu agencia sin tu
+                  acuerdo expreso. Elige cómo sellar el desenlace de este umbral:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTablaERatification('VELO')}
+                    className="p-3 rounded-lg border border-[#6ad1cc]/45 bg-[#2e7d7b]/15 hover:bg-[#2e7d7b]/25 text-left transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-[#6ad1cc]">
+                      1. Velo estricto y pacto simbólico
+                    </div>
+                    <div className="text-[11px] text-[#d6cbb9] mt-0.5">
+                      Cambia a Nivel 0 y preserva tu agencia mediante elipsis.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTablaERatification('SERVIDUMBRE')}
+                    className="p-3 rounded-lg border border-[#c59b4e]/45 bg-[#c59b4e]/10 hover:bg-[#c59b4e]/20 text-left transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-[#e5be6e]">
+                      2. Servidumbre ritual no sexual
+                    </div>
+                    <div className="text-[11px] text-[#d6cbb9] mt-0.5">
+                      Sustituye la caída por una deuda ritual de vigilia.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTablaERatification('RESISTENCIA')}
+                    className="p-3 rounded-lg border border-[#d43750]/45 bg-[#9e1b32]/20 hover:bg-[#9e1b32]/30 text-left transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-[#ff8fa0]">
+                      3. Arco de resistencia (1 INH)
+                    </div>
+                    <div className="text-[11px] text-[#d6cbb9] mt-0.5">
+                      Mantente en 1 INH para intentar cerrar el arco luchando.
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTablaERatification('RETIRADA')}
+                    className="p-3 rounded-lg border border-[rgba(216,198,174,0.2)] bg-[#09080c] hover:border-[#ece3d5]/50 text-left transition-colors"
+                  >
+                    <div className="text-xs font-semibold text-[#ece3d5]">
+                      4. Retirada digna del personaje
+                    </div>
+                    <div className="text-[11px] text-[#b5a998] mt-0.5">
+                      Cierra la participación de este investigador con aftercare.
+                    </div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setThresholdModal(null)}
+                className="w-full py-2.5 rounded-lg bg-[#9e1b32] hover:bg-[#b5223d] text-[#ece3d5] font-semibold text-sm transition-colors"
+              >
+                Aceptar transformación y continuar
+              </button>
+            )}
           </div>
         </div>
       )}

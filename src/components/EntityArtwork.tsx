@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BestiaryEntity, Investigator } from '../types/game';
-import { getEntityPlateMeta } from '../data/artworkAssets';
+import {
+  getEntityPlateMeta,
+  INVESTIGATOR_PORTRAITS,
+} from '../data/artworkAssets';
 
 export const EntityArtwork: React.FC<{
   artworkKey: BestiaryEntity['artworkKey'];
@@ -9,6 +12,10 @@ export const EntityArtwork: React.FC<{
 }> = ({ artworkKey, className = 'w-full h-full', compact = false }) => {
   const [imgFailed, setImgFailed] = useState(false);
   const meta = getEntityPlateMeta(artworkKey);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [artworkKey]);
 
   return (
     <div
@@ -274,6 +281,13 @@ export const InvestigatorCrest: React.FC<{
   name?: string;
   className?: string;
 }> = ({ portraitKey, name, className = 'w-full h-full' }) => {
+  const [imgFailed, setImgFailed] = useState(false);
+  const portrait = INVESTIGATOR_PORTRAITS[portraitKey];
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [portraitKey]);
+
   const palette = (() => {
     switch (portraitKey) {
       case 'elena':
@@ -294,6 +308,30 @@ export const InvestigatorCrest: React.FC<{
         return { bg: '#112224', ring: '#6ad1cc', glow: '#c59b4e' };
     }
   })();
+
+  if (!imgFailed && portrait?.imageSrc) {
+    return (
+      <div
+        className={`relative overflow-hidden rounded-xl border bg-[#09080c] shadow-inner select-none ${className}`}
+        style={{
+          borderColor: `${portrait.ringHex}88`,
+          backgroundColor: portrait.fallbackBg,
+        }}
+      >
+        <img
+          src={portrait.imageSrc}
+          alt={name ? `Retrato de ${name}` : `Retrato de investigador`}
+          referrerPolicy="no-referrer"
+          onError={() => setImgFailed(true)}
+          className="w-full h-full object-cover object-top"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none rounded-xl ring-1 ring-inset ring-[#e5be6e]/25 bg-gradient-to-t from-[#09080c]/35 via-transparent to-transparent"
+        />
+      </div>
+    );
+  }
 
   const symbol = (() => {
     switch (portraitKey) {
@@ -367,7 +405,7 @@ export const InvestigatorCrest: React.FC<{
       className={className}
       fill="none"
       role={name ? 'img' : undefined}
-      aria-label={name ? `Emblema de ${name}` : undefined}
+      aria-label={name ? `Retrato de ${name}` : undefined}
       aria-hidden={name ? undefined : true}
     >
       <defs>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Flame,
   Heart,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import {
   BestiaryEntity,
+  CombatSessionSnapshot,
   DiceRollResult,
   Investigator,
   NarrativeLevel,
@@ -20,10 +21,13 @@ import {
 } from '../types/game';
 import { REPERTORIO_MOVES } from '../data/tables';
 import {
+  applyClimaxDefeat,
   applyInhibitionLoss,
+  getArrebatoModifiers,
   resolveOpposedIntimate,
   rollD100,
   rollDiceNotation,
+  tickArrebatoRound,
 } from '../utils/brpEngine';
 import { soundEngine } from '../utils/soundEngine';
 import { getEntityPlateMeta } from '../data/artworkAssets';
@@ -33,6 +37,10 @@ interface IntimateCombatViewProps {
   investigator: Investigator;
   entity: BestiaryEntity;
   narrativeLevel: NarrativeLevel;
+  acceptDrenaje?: boolean;
+  acceptArrebato?: boolean;
+  initialSnapshot?: CombatSessionSnapshot | null;
+  onSnapshotChange?: (snapshot: CombatSessionSnapshot) => void;
   onUpdateInvestigator: (updated: Investigator) => void;
   onRollRecorded: (roll: DiceRollResult) => void;
   onLog: (
@@ -40,7 +48,11 @@ interface IntimateCombatViewProps {
     title: string,
     detail: string
   ) => void;
-  onTriggerThresholdModal: (title: string, lines: string[]) => void;
+  onTriggerThresholdModal: (
+    title: string,
+    lines: string[],
+    reachedZero?: boolean
+  ) => void;
   onCombatComplete: (outcome: 'VICTORY' | 'DEFEAT' | 'ESCAPED') => void;
   onTriggerXCard: () => void;
 }
@@ -57,6 +69,10 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
   investigator,
   entity: initialEntity,
   narrativeLevel,
+  acceptDrenaje = true,
+  acceptArrebato = true,
+  initialSnapshot,
+  onSnapshotChange,
   onUpdateInvestigator,
   onRollRecorded,
   onLog,
@@ -64,12 +80,21 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
   onCombatComplete,
   onTriggerXCard,
 }) => {
-  const [entity, setEntity] = useState<BestiaryEntity>(() => ({ ...initialEntity }));
-  const [round, setRound] = useState(1);
+  const [entity, setEntity] = useState<BestiaryEntity>(() =>
+    initialSnapshot?.entity
+      ? { ...initialSnapshot.entity }
+      : { ...initialEntity }
+  );
+  const [round, setRound] = useState(initialSnapshot?.round ?? 1);
   const [pmToBurn, setPmToBurn] = useState(0);
+  const [pendingBurnedPm, setPendingBurnedPm] = useState(
+    initialSnapshot?.pendingBurnedPm ?? 0
+  );
   const [selectedMoveId, setSelectedMoveId] = useState<RepertorioMove['id']>('beso');
-  const [ironUsed, setIronUsed] = useState(false);
-  const [entityPenalty, setEntityPenalty] = useState(0);
+  const [ironUsed, setIronUsed] = useState(initialSnapshot?.ironUsed ?? false);
+  const [entityPenalty, setEntityPenalty] = useState(
+    initialSnapshot?.entityPenalty ?? 0
+  );
   const [combatStatus, setCombatStatus] = useState<
     'ACTIVE' | 'VICTORY' | 'DEFEAT' | 'ESCAPED'
   >('ACTIVE');
@@ -84,11 +109,34 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
     },
   ]);
 
+  useEffect(() => {
+    if (combatStatus === 'ACTIVE' && onSnapshotChange) {
+      onSnapshotChange({
+        entity,
+        round,
+        entityPenalty,
+        ironUsed,
+        pendingBurnedPm,
+        returnNodeId: initialSnapshot?.returnNodeId ?? null,
+      });
+    }
+  }, [
+    entity,
+    round,
+    entityPenalty,
+    ironUsed,
+    pendingBurnedPm,
+    combatStatus,
+    onSnapshotChange,
+    initialSnapshot?.returnNodeId,
+  ]);
+
   const availableMoves = REPERTORIO_MOVES.filter(
     (m) => m.minLevel <= narrativeLevel
   );
   const activeMove =
     availableMoves.find((m) => m.id === selectedMoveId) || availableMoves[0];
+  const arrebatoMods = getArrebatoModifiers(investigator);
 
   const appendLog = (
     title: string,
@@ -107,7 +155,12 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
     reason: string
   ): Investigator => {
     if (amount <= 0) return currentInv;
-    const res = applyInhibitionLoss(currentInv, amount, reason);
+    const res = applyInhibitionLoss(
+      currentInv,
+      amount,
+      reason,
+      acceptArrebato
+    );
     if (res.notes.length > 0) {
       onLog('THRESHOLD', 'Desplazamiento de Inhibición', res.notes.join(' '));
       if (
@@ -119,11 +172,12 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         soundEngine.playCorruption();
         onTriggerThresholdModal(
           res.reachedZero
-            ? 'Umbral 0 · La Caída Consumada'
+            ? 'Umbral 0 · La Caída Consumada (Tabla E)'
             : res.triggeredArrebato
               ? 'Arrebato de Lujuria (Tabla A)'
               : 'Umbral de Inhibición Cruzado',
-          res.notes
+          res.notes,
+          res.reachedZero
         );
       }
     }
@@ -143,57 +197,84 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
     );
   };
 
-  const applyClimaxDefeat = (invState: Investigator) => {
+  const finishWithClimaxDefeat = (
+    invState: Investigator,
+    totalBurnedPm: number,
+    wasExtremeOrRitual = false
+  ) => {
     soundEngine.playCorruption();
-    let updated = { ...invState };
-    let msg = `Tu Aguante Carnal ha llegado a 0. ${entity.climaxEffectName}: ${entity.climaxEffectDesc}`;
+    const climax = applyClimaxDefeat(invState, entity, {
+      wasExtremeOrRitual,
+      pendingBurnedPm: totalBurnedPm,
+      acceptDrenaje,
+      acceptArrebato,
+    });
 
-    if (entity.climaxType === 'PM') {
-      const drained = rollDiceNotation('1d6').total;
-      updated.pm = Math.max(0, updated.pm - drained);
-      msg += ` Pierdes ${drained} PM.`;
-    } else if (entity.climaxType === 'POD') {
-      const podDrain = rollDiceNotation('1d4').total;
-      updated.attributes = {
-        ...updated.attributes,
-        POD: Math.max(5, updated.attributes.POD - podDrain),
-      };
-      msg += ` Pierdes ${podDrain} POD permanente.`;
-    } else if (entity.climaxType === 'CON') {
-      const pvDrain = rollDiceNotation('1d3').total;
-      updated.pv = Math.max(1, updated.pv - pvDrain);
-      msg += ` El frío de la fosa resta ${pvDrain} PV.`;
-    } else {
-      updated.marcas = [
-        ...updated.marcas,
-        `Marca de ${entity.name} (${entity.climaxEffectName})`,
-      ];
+    onRollRecorded(climax.awakeningRoll);
+    if (climax.inhResolution.notes.length > 0) {
+      onLog(
+        'THRESHOLD',
+        'Desplazamiento de Inhibición en Clímax',
+        climax.inhResolution.notes.join(' ')
+      );
+      if (
+        climax.inhResolution.triggeredArrebato ||
+        climax.inhResolution.newThresholdFilias.length > 0 ||
+        climax.inhResolution.crossedTenWarning ||
+        climax.inhResolution.reachedZero
+      ) {
+        onTriggerThresholdModal(
+          climax.inhResolution.reachedZero
+            ? 'Umbral 0 · La Caída Consumada (Tabla E)'
+            : climax.inhResolution.triggeredArrebato
+              ? 'Arrebato de Lujuria (Tabla A)'
+              : 'Umbral de Inhibición Cruzado',
+          climax.inhResolution.notes,
+          climax.inhResolution.reachedZero
+        );
+      }
     }
 
-    // Check "Al filo" mechanic (5.4.1): if PV is low (1..5), extra desperate resistance chance or end
-    updated = handleApplyInhHit(updated, 2, `Clímax con ${entity.name}`);
-    onUpdateInvestigator(updated);
-    onLog('COMBAT', `Clímax de ${entity.name}`, msg);
+    onUpdateInvestigator(climax.updatedInvestigator);
+    onLog('COMBAT', `Clímax de ${entity.name}`, climax.summary);
+    appendLog(`Clímax · ${entity.climaxEffectName}`, climax.summary, 'entity');
+    setPendingBurnedPm(0);
     setCombatStatus('DEFEAT');
-    setCombatSummary(msg);
+    setCombatSummary(climax.summary);
   };
 
-  // Action 1: Resist / Counter in Intimate Exchange (Section 5.2 & 5.3)
+  const advanceArrebatoEndOfRound = (inv: Investigator): Investigator => {
+    const tick = tickArrebatoRound(inv);
+    if (tick.ended && tick.note) {
+      if (tick.lucidezRoll) onRollRecorded(tick.lucidezRoll);
+      onLog('CORRUPTION', 'Colgajo de Lucidez (3.3)', tick.note);
+      appendLog('Fin de Arrebato · Colgajo de Lucidez', tick.note, 'warning');
+    }
+    return tick.updatedInvestigator;
+  };
+
+  // Action 1: Resist / Counter in Intimate Exchange (Section 5.1, 5.2 & 5.3)
   const handleIntimateExchange = (posture: 'RESISTIR' | 'DOMINAR') => {
     if (combatStatus !== 'ACTIVE') return;
     soundEngine.playDiceRoll();
 
-    let nextInv = { ...investigator };
-    const actualPm = Math.min(3, pmToBurn, nextInv.pm);
+    let nextInv: Investigator = { ...investigator };
+    // Section 3.3: Arrebato forbids burning PM in Resistance
+    const allowedPm =
+      posture === 'RESISTIR' && arrebatoMods.forbidPmBurnInResistance
+        ? 0
+        : pmToBurn;
+    const actualPm = Math.min(3, allowedPm, nextInv.pm);
     if (actualPm > 0) {
       nextInv.pm -= actualPm;
     }
+    const nextPendingBurnedPm = pendingBurnedPm + actualPm;
+    setPendingBurnedPm(nextPendingBurnedPm);
 
     const entityMove = pickEntityMove();
     const pmBonus = actualPm * 10;
 
     if (posture === 'RESISTIR') {
-      // Entity attacks with Technique/Provocar vs Investigator Resistencia Carnal
       const entitySkill = Math.max(
         10,
         entity.skills.tecnica + entityMove.attackerMod - entityPenalty
@@ -212,7 +293,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         0,
         `${nextInv.name} (Resistencia Carnal)`,
         playerSkill,
-        0,
+        arrebatoMods.defensiveBonusDice,
         entityMove.acMultiplier
       );
 
@@ -227,10 +308,6 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         nextInv.accumulatedCombatPenalty += res.defenderPenaltyDelta;
 
         let inhHit = 0;
-        if (actualPm > 0) {
-          // 5.2.3: Each PM burned on a lost roll costs +1 INH
-          inhHit += actualPm;
-        }
         if (res.extraPmLoss > 0) {
           nextInv.pm = Math.max(0, nextInv.pm - res.extraPmLoss);
         }
@@ -247,30 +324,32 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
 
         const detail = `${flavor} Tirada: ${entity.name} sacó ${res.attackerRoll.rawRoll} (${res.attackerRoll.degree}) frente a tu ${res.defenderRoll.rawRoll} (${res.defenderRoll.degree}). Sufres -${res.acDamage} AC${
           res.defenderPenaltyDelta ? ` y -${res.defenderPenaltyDelta}% acumulativo` : ''
-        }${inhHit > 0 ? ` y -${inhHit} INH` : ''}.`;
+        }${inhHit > 0 ? ` y -${inhHit} INH` : ''}.${
+          actualPm > 0
+            ? ` (+${actualPm} PM acumulados para pagar si hay derrota)`
+            : ''
+        }`;
 
         appendLog(`${entity.name} se impone`, detail, 'entity');
         onLog('COMBAT', `Asalto ${round} · Superada`, detail);
 
         nextInv = handleApplyInhHit(nextInv, inhHit, `Asalto vs ${entity.name}`);
-        if (nextInv.arrebatoRounds > 0) {
-          nextInv.arrebatoRounds = Math.max(0, nextInv.arrebatoRounds - 1);
-        }
-        onUpdateInvestigator(nextInv);
-
         if (nextInv.ac <= 0) {
-          applyClimaxDefeat(nextInv);
+          const extremeOrRitual =
+            res.attackerRoll.degree === 'EXTREMO' ||
+            res.attackerRoll.degree === 'CRITICO' ||
+            entityMove.id === 'union';
+          finishWithClimaxDefeat(nextInv, nextPendingBurnedPm, extremeOrRitual);
           return;
         }
+        nextInv = advanceArrebatoEndOfRound(nextInv);
+        onUpdateInvestigator(nextInv);
       } else if (res.winner === 'DEFENDER') {
         soundEngine.playSuccess(res.defenderRoll.degree === 'EXTREMO');
-        // Player holds ground and wears down entity's rhythm (1d3 AC counter-pressure)
         const counterAc = rollDiceNotation('1d3').total;
         const nextEntityAc = Math.max(0, entity.ac - counterAc);
         setEntity((e) => ({ ...e, ac: nextEntityAc }));
-        if (nextInv.arrebatoRounds > 0) {
-          nextInv.arrebatoRounds = Math.max(0, nextInv.arrebatoRounds - 1);
-        }
+        nextInv = advanceArrebatoEndOfRound(nextInv);
         onUpdateInvestigator(nextInv);
 
         const detail = `${flavor} Contienes el empuje (${res.defenderRoll.rawRoll} ${res.defenderRoll.degree} vs ${res.attackerRoll.rawRoll} ${res.attackerRoll.degree}) y quiebras el compás de la entidad (-${counterAc} AC al oponente).`;
@@ -278,13 +357,15 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         onLog('COMBAT', `Asalto ${round} · Resistido`, detail);
 
         if (nextEntityAc <= 0) {
+          setPendingBurnedPm(0);
           setCombatStatus('VICTORY');
           setCombatSummary(
-            `Has doblegado el ritmo de ${entity.name} hasta agotar su Aguante Carnal. Tienes el control absoluto del umbral para huir, sellar el rito o invertirlo.`
+            `Has doblegado el ritmo de ${entity.name} hasta agotar su Aguante Carnal. Los PM quemados en tus victorias no cobran coste adicional en INH (Sección 5.6).`
           );
           return;
         }
       } else {
+        nextInv = advanceArrebatoEndOfRound(nextInv);
         onUpdateInvestigator(nextInv);
         appendLog(
           'Empate tenso',
@@ -310,7 +391,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
       const res = resolveOpposedIntimate(
         `${nextInv.name} (${move.name})`,
         playerSkill,
-        0,
+        arrebatoMods.offensiveBonusDice,
         `${entity.name} (Resistencia)`,
         entitySkill,
         0,
@@ -340,12 +421,12 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
           setEntityPenalty((p) => p + res.defenderPenaltyDelta);
         }
 
-        // Initiating intimate contact against a Mythos entity still tests Restraint slightly (1 INH)
         nextInv = handleApplyInhHit(
           nextInv,
           1,
           `Tomar la iniciativa con ${entity.name}`
         );
+        nextInv = advanceArrebatoEndOfRound(nextInv);
         onUpdateInvestigator(nextInv);
 
         const detail = `${flavor} Tu maniobra (${res.attackerRoll.rawRoll} ${res.attackerRoll.degree}) supera su defensa (${res.defenderRoll.rawRoll} ${res.defenderRoll.degree}): -${res.acDamage} AC a ${entity.name}.`;
@@ -353,6 +434,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         onLog('COMBAT', `Asalto ${round} · Iniciativa`, detail);
 
         if (nextEntityAc <= 0) {
+          setPendingBurnedPm(0);
           setCombatStatus('VICTORY');
           setCombatSummary(
             `${entity.name} cae a 0 AC bajo tu cadencia. ${entity.weaknessDesc}`
@@ -360,28 +442,25 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
           return;
         }
       } else {
-        // Failed offensive attempt (Entrega inflicts 1d4 self AC if lost)
-        let selfAcLoss = move.id === 'entrega' ? rollDiceNotation('1d4').total : 1;
-        let selfInhLoss = actualPm > 0 ? actualPm : 0;
+        const selfAcLoss =
+          move.id === 'entrega' ? rollDiceNotation('1d4').total : 1;
         nextInv.ac = Math.max(0, nextInv.ac - selfAcLoss);
-        nextInv = handleApplyInhHit(
-          nextInv,
-          selfInhLoss,
-          `Rechazo de maniobra ante ${entity.name}`
-        );
-        onUpdateInvestigator(nextInv);
 
         appendLog(
           'Maniobra interceptada',
-          `${entity.name} lee tu gesto (${res.defenderRoll.rawRoll} vs tu ${res.attackerRoll.rawRoll}). Pierdes ${selfAcLoss} AC${
-            selfInhLoss ? ` y ${selfInhLoss} INH` : ''
-          }.`,
+          `${entity.name} lee tu gesto (${res.defenderRoll.rawRoll} vs tu ${res.attackerRoll.rawRoll}). Pierdes ${selfAcLoss} AC.`,
           'entity'
         );
         if (nextInv.ac <= 0) {
-          applyClimaxDefeat(nextInv);
+          finishWithClimaxDefeat(
+            nextInv,
+            nextPendingBurnedPm,
+            res.defenderRoll.degree === 'EXTREMO' || move.id === 'union'
+          );
           return;
         }
+        nextInv = advanceArrebatoEndOfRound(nextInv);
+        onUpdateInvestigator(nextInv);
       }
     }
 
@@ -398,26 +477,32 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
     const roll = rollD100(
       'Resistencia de Hierro (Extrema)',
       investigator.skills.resistenciaCarnal,
-      'EXTREMO'
+      'EXTREMO',
+      arrebatoMods.defensiveBonusDice
     );
     onRollRecorded(roll);
 
     if (roll.isSuccess) {
       soundEngine.playSuccess(true);
-      const msg = `Resistencia de Hierro exitosa (${roll.rawRoll} ≤ ${roll.effectiveTarget}). Detienes tu propia respuesta corporal en seco y rompes el hechizo sin pagar clímax.`;
+      const msg = `Resistencia de Hierro exitosa (${roll.rawRoll} ≤ ${roll.effectiveTarget}). Detienes tu propia respuesta corporal en seco y rompes el hechizo sin pagar clímax ni PM acumulados.`;
       appendLog('Resistencia de Hierro', msg, 'player');
       onLog('COMBAT', 'Resistencia de Hierro', msg);
+      setPendingBurnedPm(0);
       setCombatStatus('ESCAPED');
       setCombatSummary(msg);
     } else {
       const msg = `Resistencia de Hierro fallida (${roll.rawRoll} > ${roll.effectiveTarget}). El pulso sigue obedeciendo al umbral (-1 AC).`;
-      const updated = { ...investigator, ac: Math.max(0, investigator.ac - 1) };
-      onUpdateInvestigator(updated);
+      let updated: Investigator = {
+        ...investigator,
+        ac: Math.max(0, investigator.ac - 1),
+      };
       appendLog('Resistencia de Hierro fallida', msg, 'entity');
       if (updated.ac <= 0) {
-        applyClimaxDefeat(updated);
+        finishWithClimaxDefeat(updated, pendingBurnedPm, false);
         return;
       }
+      updated = advanceArrebatoEndOfRound(updated);
+      onUpdateInvestigator(updated);
       setRound((r) => r + 1);
     }
   };
@@ -445,6 +530,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
       onLog('COMBAT', `Debilidad explotada`, msg);
 
       if (nextEntityAc <= 0) {
+        setPendingBurnedPm(0);
         setCombatStatus('VICTORY');
         setCombatSummary(
           `Al quebrar su punto flaco (${entity.weaknessName}), ${entity.name} pierde toda compostura y retrocede.`
@@ -453,20 +539,21 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
       }
     } else {
       const acHit = rollDiceNotation('1d3').total;
-      const updated = {
+      let updated: Investigator = {
         ...investigator,
         ac: Math.max(0, investigator.ac - acHit),
       };
-      onUpdateInvestigator(updated);
       appendLog(
         'Intento frustrado',
         `No logras aplicar ${entity.weaknessName} a tiempo (${roll.rawRoll}). Sufres -${acHit} AC.`,
         'entity'
       );
       if (updated.ac <= 0) {
-        applyClimaxDefeat(updated);
+        finishWithClimaxDefeat(updated, pendingBurnedPm, false);
         return;
       }
+      updated = advanceArrebatoEndOfRound(updated);
+      onUpdateInvestigator(updated);
     }
     setRound((r) => r + 1);
   };
@@ -475,7 +562,11 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
   const handlePhysicalStrike = () => {
     if (combatStatus !== 'ACTIVE') return;
     soundEngine.playDiceRoll();
-    const roll = rollD100('Pelea / Romper contacto', investigator.skills.pelea, 'NORMAL');
+    const roll = rollD100(
+      'Pelea / Romper contacto',
+      investigator.skills.pelea,
+      'NORMAL'
+    );
     onRollRecorded(roll);
 
     if (roll.isSuccess) {
@@ -490,6 +581,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
         'player'
       );
       if (nextPv <= 0) {
+        setPendingBurnedPm(0);
         setCombatStatus('VICTORY');
         setCombatSummary(
           `${entity.name} se desploma o se disuelve tras el impacto físico. El peligro inmediato ha terminado.`
@@ -498,17 +590,21 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
       }
     } else {
       const retAc = rollDiceNotation('1d4').total;
-      const updated = { ...investigator, ac: Math.max(0, investigator.ac - retAc) };
-      onUpdateInvestigator(updated);
+      let updated: Investigator = {
+        ...investigator,
+        ac: Math.max(0, investigator.ac - retAc),
+      };
       appendLog(
         'Fallo físico',
         `Tu golpe pasa de largo (${roll.rawRoll}) y ${entity.name} aprovecha la cercanía (-${retAc} AC).`,
         'entity'
       );
       if (updated.ac <= 0) {
-        applyClimaxDefeat(updated);
+        finishWithClimaxDefeat(updated, pendingBurnedPm, false);
         return;
       }
+      updated = advanceArrebatoEndOfRound(updated);
+      onUpdateInvestigator(updated);
     }
     setRound((r) => r + 1);
   };
@@ -642,6 +738,19 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
       <div className="p-4 sm:p-5 space-y-5">
         {combatStatus === 'ACTIVE' ? (
           <>
+            {arrebatoMods.active && (
+              <div className="p-3 rounded-lg border border-[#d43750]/60 bg-[#9e1b32]/18 text-xs flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[#ff8fa0] font-semibold">
+                  Arrebato de Lujuria activo ({investigator.arrebatoRounds}{' '}
+                  asaltos): +1D a Dominar · -1D a Resistir · Sin quema de PM en
+                  Resistencia
+                </span>
+                <span className="font-mono-tabular text-[11px] text-[#e5be6e]">
+                  Colgajo de Lucidez al terminar
+                </span>
+              </div>
+            )}
+
             {/* PM Burn + Repertorio Selector */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               <div className="lg:col-span-7 space-y-2">
@@ -697,7 +806,7 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
                           onClick={() => setPmToBurn(val)}
                           className={`py-1.5 rounded text-xs font-mono-tabular border transition-colors ${
                             disabled
-                              ? 'opacity-30 cursor-not-allowed border-[#7c7166]/20 text-[#7c7166]'
+                              ? 'opacity-30 cursor-not-allowed border-[#9b8f82]/20 text-[#9b8f82]'
                               : pmToBurn === val
                                 ? 'border-[#6ad1cc] bg-[#2e7d7b]/30 text-[#ece3d5] font-semibold'
                                 : 'border-[rgba(216,198,174,0.16)] text-[#b5a998] hover:text-[#ece3d5]'
@@ -708,8 +817,14 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
                       );
                     })}
                   </div>
-                  <p className="text-[11px] text-[#7c7166] mt-1.5">
-                    Si quemas PM y pierdes el intercambio, cada PM cuesta +1 INH extra.
+                  <p className="text-[11px] text-[#9b8f82] mt-1.5">
+                    Los PM quemados se acumulan y solo cuestan +1 INH/PM si el
+                    encuentro acaba en derrota (5.1/5.6).
+                    {pendingBurnedPm > 0 && (
+                      <span className="block text-[#e5be6e] font-mono-tabular mt-0.5">
+                        Acumulados en riesgo: {pendingBurnedPm} PM
+                      </span>
+                    )}
                   </p>
                 </div>
 
@@ -721,13 +836,16 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
                   >
                     <span className="flex items-center gap-2">
                       <Shield className="w-4 h-4 text-[#6ad1cc]" />
-                      <span>Resistir con Resistencia Carnal</span>
+                      <span>
+                        Resistir con Resistencia Carnal
+                        {arrebatoMods.forbidPmBurnInResistance ? ' (-1D, sin PM)' : ''}
+                      </span>
                     </span>
                     <span className="font-mono-tabular text-[#6ad1cc]">
                       {Math.max(
                         5,
                         investigator.skills.resistenciaCarnal +
-                          pmToBurn * 10 -
+                          (arrebatoMods.forbidPmBurnInResistance ? 0 : pmToBurn * 10) -
                           investigator.accumulatedCombatPenalty
                       )}
                       %
@@ -741,7 +859,10 @@ export const IntimateCombatView: React.FC<IntimateCombatViewProps> = ({
                   >
                     <span className="flex items-center gap-2">
                       <Flame className="w-4 h-4 text-[#e5be6e]" />
-                      <span>Imponer ritmo ({activeMove.name})</span>
+                      <span>
+                        Imponer ritmo ({activeMove.name})
+                        {arrebatoMods.active ? ' (+1D)' : ''}
+                      </span>
                     </span>
                     <span className="font-mono-tabular text-[#e5be6e]">
                       {Math.max(

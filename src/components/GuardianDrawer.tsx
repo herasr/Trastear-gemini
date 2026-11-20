@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   BookMarked,
+  Bot,
   Dices,
+  Download,
   Feather,
   Package,
   ScrollText,
+  Send,
   Sparkles,
+  Upload,
 } from 'lucide-react';
-import { ChronicleLog, DiarioEntry, Investigator } from '../types/game';
+import {
+  ChronicleLog,
+  DiarioEntry,
+  Investigator,
+  NarrativeLevel,
+} from '../types/game';
 import {
   GEN_DETALLES_28_2,
   GEN_DIALOGOS_28_3,
@@ -26,27 +35,42 @@ import {
 } from '../data/tables';
 import { pickFromD100Table } from '../utils/brpEngine';
 import { soundEngine } from '../utils/soundEngine';
+import {
+  askRulesOracle,
+  generateSeccion29Scene,
+  OracleAnswer,
+  Seccion29Scene,
+} from '../services/guardianAiService';
 
 interface GuardianDrawerProps {
   investigator: Investigator;
   chronicle: ChronicleLog[];
   flags?: string[];
+  narrativeLevel?: NarrativeLevel;
+  hardLimits?: string[];
   onSaveDiario: (entry: DiarioEntry) => void;
   onCastSpell: (spellId: string) => void;
   onUseRelic: (relicName: string) => void;
   onLog: (type: ChronicleLog['type'], title: string, detail: string) => void;
+  onExportSession?: () => void;
+  onImportSession?: (rawJson: string) => void;
 }
 
 export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
   investigator,
   chronicle,
   flags = [],
+  narrativeLevel = 0,
+  hardLimits = [],
   onSaveDiario,
   onCastSpell,
   onUseRelic,
   onLog,
+  onExportSession,
+  onImportSession,
 }) => {
   const [tab, setTab] = useState<'CRONICA' | 'DIARIO' | 'GENERADOR'>('CRONICA');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Diario de la Caída state (Section 3.7)
   const [scene, setScene] = useState('');
@@ -67,6 +91,52 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
   }));
 
   const [randomTableOutput, setRandomTableOutput] = useState<string | null>(null);
+
+  // Guardián IA (Sección 29) & Oráculo de Reglas (RAG)
+  const [shareGrietaOptIn, setShareGrietaOptIn] = useState(false);
+  const [aiSceneLoading, setAiSceneLoading] = useState(false);
+  const [aiScene, setAiScene] = useState<Seccion29Scene | null>(null);
+  const [oracleQuestion, setOracleQuestion] = useState('');
+  const [oracleLoading, setOracleLoading] = useState(false);
+  const [oracleAnswer, setOracleAnswer] = useState<OracleAnswer | null>(null);
+
+  const handleNarrateWithGuardian = async () => {
+    setAiSceneLoading(true);
+    try {
+      const result = await generateSeccion29Scene({
+        lugar: generatedScene.lugar,
+        oficiante: generatedScene.oficiante,
+        promesa: generatedScene.promesa,
+        precio: generatedScene.precio,
+        detalle: generatedScene.detalle,
+        dialogo: generatedScene.dialogo,
+        narrativeLevel,
+        hardLimits,
+        grietaOptIn: shareGrietaOptIn
+          ? {
+              tentacion: investigator.grieta.tentacion,
+              senal: investigator.grieta.senal,
+            }
+          : null,
+      });
+      setAiScene(result);
+    } finally {
+      setAiSceneLoading(false);
+    }
+  };
+
+  const handleAskOracle = async (preset?: string) => {
+    const q = (preset ?? oracleQuestion).trim();
+    if (!q) return;
+    setOracleLoading(true);
+    try {
+      const ans = await askRulesOracle(q, narrativeLevel);
+      setOracleAnswer(ans);
+      if (preset) setOracleQuestion(preset);
+    } finally {
+      setOracleLoading(false);
+    }
+  };
 
   const handleGenerateScene = () => {
     soundEngine.playDiceRoll();
@@ -168,6 +238,58 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
       <div className="p-3.5 flex-1 overflow-y-auto max-h-[560px] space-y-3">
         {tab === 'CRONICA' && (
           <div className="space-y-3">
+            {(onExportSession || onImportSession) && (
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-[rgba(216,198,174,0.1)]">
+                <span className="text-[10px] uppercase tracking-wider text-[#9b8f82]">
+                  Archivo de Mesa (.json)
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {onExportSession && (
+                    <button
+                      type="button"
+                      onClick={onExportSession}
+                      className="px-2 py-1 rounded border border-[rgba(216,198,174,0.18)] bg-[#09080c] hover:border-[#c59b4e]/60 text-[11px] text-[#ece3d5] inline-flex items-center gap-1 whitespace-nowrap"
+                      title="Exportar ficha, consentimiento y crónica en JSON"
+                    >
+                      <Download className="w-3 h-3 text-[#c59b4e]" />
+                      <span>Exportar</span>
+                    </button>
+                  )}
+                  {onImportSession && (
+                    <>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="application/json,.json"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            if (typeof reader.result === 'string') {
+                              onImportSession(reader.result);
+                            }
+                          };
+                          reader.readAsText(file);
+                          e.target.value = '';
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2 py-1 rounded border border-[rgba(216,198,174,0.18)] bg-[#09080c] hover:border-[#6ad1cc]/60 text-[11px] text-[#ece3d5] inline-flex items-center gap-1 whitespace-nowrap"
+                        title="Importar una crónica o ficha guardada en JSON"
+                      >
+                        <Upload className="w-3 h-3 text-[#6ad1cc]" />
+                        <span>Importar</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {flags.length > 0 && (
               <div className="p-2.5 rounded-lg bg-[#09080c] border border-[#c59b4e]/35 space-y-1.5">
                 <div className="text-[10px] uppercase tracking-wider text-[#e5be6e] font-semibold">
@@ -185,7 +307,7 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
             )}
 
             {chronicle.length === 0 ? (
-              <p className="text-xs text-[#7c7166] italic py-4 text-center">
+              <p className="text-xs text-[#9b8f82] italic py-4 text-center">
                 La crónica aguarda tu primera decisión.
               </p>
             ) : (
@@ -362,15 +484,15 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
               />
 
               {!investigator.diarioBonusUsed && (
-                <div className="flex items-center gap-2 text-[11px] pt-1">
-                  <span className="text-[#b5a998]">Bono de entrada:</span>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] pt-1">
+                  <span className="text-[#b5a998]">Bono único (3.7):</span>
                   <button
                     type="button"
                     onClick={() => setBonusChoice('AC')}
                     className={`px-2 py-0.5 rounded border ${
                       bonusChoice === 'AC'
                         ? 'border-[#c59b4e] text-[#e5be6e] bg-[#c59b4e]/15'
-                        : 'border-[rgba(216,198,174,0.15)] text-[#7c7166]'
+                        : 'border-[rgba(216,198,174,0.15)] text-[#9b8f82]'
                     }`}
                   >
                     +1 AC
@@ -381,10 +503,11 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
                     className={`px-2 py-0.5 rounded border ${
                       bonusChoice === 'SKILL'
                         ? 'border-[#c59b4e] text-[#e5be6e] bg-[#c59b4e]/15'
-                        : 'border-[rgba(216,198,174,0.15)] text-[#7c7166]'
+                        : 'border-[rgba(216,198,174,0.15)] text-[#9b8f82]'
                     }`}
+                    title="Concede +10% a la primera tirada relacionada (nunca recupera COR ni INH)"
                   >
-                    +1 COR
+                    +10% 1.ª tirada
                   </button>
                 </div>
               )}
@@ -452,6 +575,121 @@ export const GuardianDrawer: React.FC<GuardianDrawerProps> = ({
                 <p className="text-[#7c7166]">{generatedScene.dialogo.objecion}</p>
                 <p className="text-[#e5be6e]">{generatedScene.dialogo.replica}</p>
               </div>
+
+              <div className="pt-2 border-t border-[rgba(216,198,174,0.1)] space-y-2">
+                <label className="flex items-start gap-2 text-[11px] text-[#9b8f82] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={shareGrietaOptIn}
+                    onChange={(e) => setShareGrietaOptIn(e.target.checked)}
+                    className="mt-0.5 accent-[#c59b4e]"
+                  />
+                  <span>
+                    Incluir Tentación y Señal de Grieta (nunca Herida, Consentimiento ni Diario)
+                  </span>
+                </label>
+                <button
+                  type="button"
+                  disabled={aiSceneLoading}
+                  onClick={handleNarrateWithGuardian}
+                  className="w-full py-1.5 px-3 rounded border border-[#2e7d7b]/60 bg-[#2e7d7b]/20 hover:bg-[#2e7d7b]/35 text-[#6ad1cc] text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>
+                    {aiSceneLoading
+                      ? 'Tejiendo escena (Sec. 29)...'
+                      : 'Narrar con Guardián IA (Sec. 29)'}
+                  </span>
+                </button>
+              </div>
+
+              {aiScene && (
+                <div className="mt-2 p-2.5 rounded bg-[#14111a] border border-[#2e7d7b]/50 space-y-1.5 text-[11px]">
+                  <div className="flex items-center justify-between text-[10px] uppercase tracking-wider">
+                    <span className="text-[#6ad1cc] font-semibold">
+                      Escena · Método Sección 29
+                    </span>
+                    <span className="text-[#9b8f82]">
+                      {aiScene.source === 'gemini' ? 'Gemini IA' : 'Modo local'}
+                    </span>
+                  </div>
+                  {aiScene.notice && (
+                    <p className="text-[10px] text-[#e5be6e]">{aiScene.notice}</p>
+                  )}
+                  <p className="text-[#ece3d5]"><strong>1. Umbral:</strong> {aiScene.umbral}</p>
+                  <p className="text-[#d6cbb9]"><strong>2. Reconocimiento:</strong> {aiScene.reconocimiento}</p>
+                  <p className="text-[#d6cbb9]"><strong>3. Aproximación:</strong> {aiScene.aproximacion}</p>
+                  <p className="text-[#d6cbb9]"><strong>4. Objeción:</strong> {aiScene.objecion}</p>
+                  <p className="text-[#e5be6e]"><strong>5. Decisión (antes del dado):</strong> {aiScene.pausaDecision}</p>
+                  <p className="text-[#6ad1cc]"><strong>6. Regla:</strong> {aiScene.reglaSugerida}</p>
+                  <p className="text-[#b5a998] italic"><strong>7. Imagen final:</strong> {aiScene.imagenFinal}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Oráculo de Reglas (RAG sobre el módulo) */}
+            <div className="p-3 rounded-lg bg-[#09080c] border border-[rgba(216,198,174,0.14)] space-y-2">
+              <div className="font-semibold text-[#6ad1cc] flex items-center gap-1.5">
+                <Bot className="w-3.5 h-3.5" />
+                <span>Oráculo de Reglas (RAG)</span>
+              </div>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleAskOracle();
+                }}
+                className="flex gap-1.5"
+              >
+                <input
+                  type="text"
+                  value={oracleQuestion}
+                  onChange={(e) => setOracleQuestion(e.target.value)}
+                  placeholder="Ej: ¿qué pasa si quemo 3 PM y pierdo?"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 rounded bg-[#14111a] border border-[rgba(216,198,174,0.16)] text-[#ece3d5] placeholder-[#9b8f82] text-[11px] focus:outline-none focus:border-[#6ad1cc]"
+                />
+                <button
+                  type="submit"
+                  disabled={oracleLoading}
+                  className="px-2.5 py-1.5 rounded bg-[#2e7d7b] hover:bg-[#389592] text-[#09080c] font-semibold text-[11px] inline-flex items-center gap-1 shrink-0 disabled:opacity-50"
+                  aria-label="Consultar Oráculo"
+                >
+                  <Send className="w-3 h-3" />
+                </button>
+              </form>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  '¿Qué pasa si quemo PM y pierdo?',
+                  '¿Cómo funciona el Arrebato?',
+                  '¿Regla de la Primera Vez?',
+                ].map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => void handleAskOracle(preset)}
+                    className="px-2 py-0.5 rounded border border-[rgba(216,198,174,0.14)] bg-[#14111a] hover:border-[#6ad1cc]/50 text-[10px] text-[#b5a998] hover:text-[#ece3d5]"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              {oracleLoading && (
+                <div className="text-[11px] text-[#9b8f82] italic">
+                  Consultando secciones del manual...
+                </div>
+              )}
+              {oracleAnswer && !oracleLoading && (
+                <div className="p-2.5 rounded bg-[#14111a] border border-[#2e7d7b]/40 space-y-1 text-[11px]">
+                  <p className="text-[#ece3d5] leading-relaxed">
+                    {oracleAnswer.answer}
+                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-[#6ad1cc] pt-1">
+                    <span>{oracleAnswer.sectionsCited.join(' · ')}</span>
+                    <span className="text-[#9b8f82]">
+                      {oracleAnswer.source === 'gemini' ? 'Gemini RAG' : 'Índice local'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-3 rounded-lg bg-[#09080c] border border-[rgba(216,198,174,0.14)] space-y-2">

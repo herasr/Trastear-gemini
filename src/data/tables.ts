@@ -1,4 +1,4 @@
-import { RepertorioMove } from '../types/game';
+import type { RepertorioMove } from '../types/game.ts';
 
 export interface TableEntry {
   min: number;

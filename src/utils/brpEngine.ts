@@ -1,4 +1,5 @@
 import {
+  BestiaryEntity,
   DifficultyLevel,
   DiceRollResult,
   FiliaEntry,
@@ -244,7 +245,7 @@ export function resolveOpposedIntimate(
     }
     acDamage = Math.max(1, Math.round(acDamage * acMultiplier));
   } else if (winner === 'DEFENDER') {
-    // Defender wins: no AC loss; if defender counterattacks, damage handled separately
+    // Defender wins: no AC loss; counterattack/recovery handled by caller
   }
 
   return {
@@ -266,6 +267,118 @@ export function pickFromD100Table<T extends { min: number; max: number }>(
   const r = rollValue ?? rollDie(100);
   const found = table.find((item) => r >= item.min && r <= item.max) ?? table[0];
   return { roll: r, entry: found };
+}
+
+/**
+ * Section 3.3: Arrebato de Lujuria mechanical modifiers while arrebatoRounds > 0.
+ * - +1 Bonus die to Técnica / Seducción
+ * - -1 Penalty die to Resistencia Carnal / POD / INT
+ * - Forbids burning PM to reinforce Resistance
+ */
+export interface ArrebatoModifiers {
+  active: boolean;
+  offensiveBonusDice: number;
+  defensiveBonusDice: number;
+  forbidPmBurnInResistance: boolean;
+}
+
+export function getArrebatoModifiers(inv: Investigator): ArrebatoModifiers {
+  if (inv.arrebatoRounds > 0) {
+    return {
+      active: true,
+      offensiveBonusDice: 1,
+      defensiveBonusDice: -1,
+      forbidPmBurnInResistance: true,
+    };
+  }
+  return {
+    active: false,
+    offensiveBonusDice: 0,
+    defensiveBonusDice: 0,
+    forbidPmBurnInResistance: false,
+  };
+}
+
+export interface ArrebatoTickResult {
+  updatedInvestigator: Investigator;
+  ended: boolean;
+  lucidezRoll?: DiceRollResult;
+  corLost: number;
+  note?: string;
+}
+
+/**
+ * Decrements active Arrebato rounds and triggers the Section 3.3 "Colgajo de Lucidez"
+ * Sanity check when the Arrebato ends.
+ */
+export function tickArrebatoRound(inv: Investigator): ArrebatoTickResult {
+  if (inv.arrebatoRounds <= 0) {
+    return { updatedInvestigator: inv, ended: false, corLost: 0 };
+  }
+  const nextRounds = Math.max(0, inv.arrebatoRounds - 1);
+  if (nextRounds > 0) {
+    return {
+      updatedInvestigator: { ...inv, arrebatoRounds: nextRounds },
+      ended: false,
+      corLost: 0,
+    };
+  }
+
+  // Arrebato ends: Colgajo de Lucidez (COR check)
+  const lucidezRoll = rollD100(
+    'Colgajo de Lucidez (fin de Arrebato)',
+    inv.cor,
+    'NORMAL',
+    0
+  );
+  const corLost = lucidezRoll.isSuccess ? 0 : 1;
+  const nextCor = Math.max(0, inv.cor - corLost);
+  const note = lucidezRoll.isSuccess
+    ? `Colgajo de Lucidez superado (${lucidezRoll.rawRoll} ≤ ${lucidezRoll.effectiveTarget}): asimilas el fin del Arrebato sin perder Cordura.`
+    : `Colgajo de Lucidez fallido (${lucidezRoll.rawRoll} > ${lucidezRoll.effectiveTarget}): el regreso a la calma cuesta -1 COR.`;
+
+  return {
+    updatedInvestigator: {
+      ...inv,
+      cor: nextCor,
+      arrebatoRounds: 0,
+      activeArrebato: null,
+    },
+    ended: true,
+    lucidezRoll,
+    corLost,
+    note,
+  };
+}
+
+/**
+ * Section 3.2: "Regla de la Primera Vez" — the very first Inhibition check of a
+ * campaign is rolled against full POD rather than current INH.
+ */
+export function resolveInhibitionCheck(
+  inv: Investigator,
+  label: string,
+  difficulty: DifficultyLevel = 'NORMAL',
+  bonusPenalty = 0
+): {
+  roll: DiceRollResult;
+  updatedInvestigator: Investigator;
+  usedFirstTimeRule: boolean;
+} {
+  const usedFirstTimeRule = !inv.firstInhRollDone;
+  const effectiveBase = usedFirstTimeRule ? inv.attributes.POD : inv.inh;
+  const fullLabel = usedFirstTimeRule
+    ? `${label} (Primera vez · POD completo)`
+    : label;
+  const roll = rollD100(fullLabel, effectiveBase, difficulty, bonusPenalty);
+  return {
+    roll,
+    updatedInvestigator: {
+      ...inv,
+      firstInhRollDone: true,
+    },
+    usedFirstTimeRule,
+  };
 }
 
 export interface InhLossResolution {
@@ -290,7 +403,8 @@ export interface InhLossResolution {
 export function applyInhibitionLoss(
   inv: Investigator,
   amount: number,
-  sourceNote: string
+  sourceNote: string,
+  acceptArrebato = true
 ): InhLossResolution {
   const notes: string[] = [];
   if (inv.inhAnomalyFixed || amount <= 0) {
@@ -322,7 +436,7 @@ export function applyInhibitionLoss(
   let nextArrebatoRounds = inv.arrebatoRounds;
   let nextActiveArrebato = inv.activeArrebato;
 
-  if (amount >= arrebatoThreshold && nextInh > 0) {
+  if (acceptArrebato && amount >= arrebatoThreshold && nextInh > 0) {
     triggeredArrebato = true;
     const { roll, entry } = pickFromD100Table(TABLA_A);
     arrebatoFilia = {
@@ -422,3 +536,313 @@ export function applyInhibitionLoss(
     notes,
   };
 }
+
+export interface ClimaxDefeatResult {
+  updatedInvestigator: Investigator;
+  summary: string;
+  baseInhLoss: number;
+  burnedPmPaid: number;
+  totalInhLoss: number;
+  inhResolution: InhLossResolution;
+  awakeningRoll: DiceRollResult;
+  corLost: number;
+  isDead: boolean;
+  isCascaron: boolean;
+}
+
+/**
+ * Sections 5.1, 5.4 & 5.6: Resolves Intimate Combat climax defeat:
+ * - 1d6 INH loss (2d6 if Extreme victory or ritual union)
+ * - Pays accumulated burned PM (+1 INH per burned PM) ONLY on defeat
+ * - Drains PM / permanent CON (CON 0 = death) / permanent POD (POD <= 20 = Cascarón)
+ * - Performs "Despertar" COR check (fail: 1d2 COR loss)
+ */
+export function applyClimaxDefeat(
+  invState: Investigator,
+  entity: BestiaryEntity,
+  options?: {
+    wasExtremeOrRitual?: boolean;
+    pendingBurnedPm?: number;
+    acceptDrenaje?: boolean;
+    acceptArrebato?: boolean;
+  }
+): ClimaxDefeatResult {
+  const wasExtremeOrRitual = Boolean(options?.wasExtremeOrRitual);
+  const burnedPmPaid = Math.max(0, options?.pendingBurnedPm ?? 0);
+  const acceptDrenaje = options?.acceptDrenaje ?? true;
+  const acceptArrebato = options?.acceptArrebato ?? true;
+
+  let updated: Investigator = {
+    ...invState,
+    attributes: { ...invState.attributes },
+    marcas: [...invState.marcas],
+    accumulatedCombatPenalty: 0,
+    arrebatoRounds: 0,
+    activeArrebato: null,
+  };
+
+  const parts: string[] = [
+    `Tu Aguante Carnal ha llegado a 0. ${entity.climaxEffectName}: ${entity.climaxEffectDesc}`,
+  ];
+
+  let isDead = Boolean(updated.isDead);
+  let isCascaron = Boolean(updated.isCascaron);
+
+  if (acceptDrenaje) {
+    if (entity.climaxType === 'PM') {
+      const drained = rollDiceNotation('1d6').total;
+      updated.pm = Math.max(0, updated.pm - drained);
+      parts.push(`Pierdes ${drained} PM.`);
+      if (entity.id === 'ninfa-zarza' && wasExtremeOrRitual) {
+        const nextCon = Math.max(0, updated.attributes.CON - 1);
+        updated.attributes.CON = nextCon;
+        updated.maxPv = Math.max(
+          1,
+          Math.floor((nextCon + updated.attributes.TAM) / 10)
+        );
+        updated.pv = Math.min(updated.pv, updated.maxPv);
+        if (nextCon <= 0) {
+          isDead = true;
+          updated.isDead = true;
+          updated.pv = 0;
+          parts.push('CON permanente reducida a 0: colapso físico fatal.');
+        } else {
+          parts.push(`La savia consume 1 CON permanente (CON actual: ${nextCon}).`);
+        }
+      }
+    } else if (entity.climaxType === 'POD') {
+      const podDrain = rollDiceNotation('1d4').total;
+      const nextPod = Math.max(0, updated.attributes.POD - podDrain);
+      updated.attributes.POD = nextPod;
+      updated.maxPm = Math.max(0, Math.floor(nextPod / 5));
+      updated.pm = Math.min(updated.pm, updated.maxPm);
+      parts.push(`Pierdes ${podDrain} POD permanente (POD actual: ${nextPod}).`);
+      if (nextPod <= 20) {
+        isCascaron = true;
+        updated.isCascaron = true;
+        parts.push(
+          'Umbral de Cascarón (POD ≤ 20): la voluntad queda vaciada como portavoz involuntario.'
+        );
+      }
+    } else if (entity.climaxType === 'CON') {
+      const conDrain = rollDiceNotation('1d3').total;
+      const nextCon = Math.max(0, updated.attributes.CON - conDrain);
+      updated.attributes.CON = nextCon;
+      updated.maxPv = Math.max(
+        1,
+        Math.floor((nextCon + updated.attributes.TAM) / 10)
+      );
+      updated.pv = Math.min(updated.pv, updated.maxPv);
+      if (nextCon <= 0) {
+        isDead = true;
+        updated.isDead = true;
+        updated.pv = 0;
+        parts.push(
+          `El frío abisal drena ${conDrain} CON permanente (CON = 0): muerte física en la fosa.`
+        );
+      } else {
+        parts.push(
+          `Drenaje de ${conDrain} CON permanente (CON actual: ${nextCon}, PV máx: ${updated.maxPv}).`
+        );
+      }
+    } else {
+      if (entity.climaxType === 'SIEMBRA') {
+        const pmDrain = rollDiceNotation('1d3').total;
+        updated.pm = Math.max(0, updated.pm - pmDrain);
+        parts.push(`Pierdes ${pmDrain} PM.`);
+      }
+      const marcaText = `Marca de ${entity.name} (${entity.climaxEffectName})`;
+      if (!updated.marcas.includes(marcaText)) {
+        updated.marcas.push(marcaText);
+      }
+      parts.push(`Recibes la marca: ${marcaText}.`);
+    }
+  } else {
+    parts.push(
+      'Drenaje de atributos omitido conforme al Documento de Consentimiento.'
+    );
+  }
+
+  // Section 5.4: 1d6 INH (2d6 on Extreme victory or ritual climax)
+  const baseInhLoss = rollDiceNotation(wasExtremeOrRitual ? '2d6' : '1d6').total;
+  const totalInhLoss = baseInhLoss + burnedPmPaid;
+  if (burnedPmPaid > 0) {
+    parts.push(
+      `Desenlace por clímax: -${baseInhLoss} INH (${
+        wasExtremeOrRitual ? '2d6 Extremo/Ritual' : '1d6'
+      }) + ${burnedPmPaid} INH por PM quemados acumulados.`
+    );
+  } else {
+    parts.push(
+      `Desenlace por clímax: -${baseInhLoss} INH (${
+        wasExtremeOrRitual ? '2d6 Extremo/Ritual' : '1d6'
+      }).`
+    );
+  }
+
+  const inhResolution = applyInhibitionLoss(
+    updated,
+    totalInhLoss,
+    `Clímax con ${entity.name}`,
+    acceptArrebato
+  );
+  updated = inhResolution.updatedInvestigator;
+
+  // Section 5.4: Awakening SAN roll (Despertar) -> fail loses 1d2 COR
+  const awakeningRoll = rollD100(
+    `Despertar tras clímax con ${entity.name} (COR)`,
+    updated.cor,
+    'NORMAL',
+    0
+  );
+  let corLost = 0;
+  if (!awakeningRoll.isSuccess) {
+    corLost = rollDiceNotation('1d2').total;
+    updated.cor = Math.max(0, updated.cor - corLost);
+    parts.push(
+      `Despertar fallido (${awakeningRoll.rawRoll} > ${awakeningRoll.effectiveTarget}): pierdes ${corLost} COR.`
+    );
+  } else {
+    parts.push(
+      `Despertar lúcido (${awakeningRoll.rawRoll} ≤ ${awakeningRoll.effectiveTarget}): conservas tu Cordura.`
+    );
+  }
+
+  return {
+    updatedInvestigator: updated,
+    summary: parts.join(' '),
+    baseInhLoss,
+    burnedPmPaid,
+    totalInhLoss,
+    inhResolution,
+    awakeningRoll,
+    corLost,
+    isDead,
+    isCascaron,
+  };
+}
+
+export type RecoveryMethod = 'VELO_DISTANCIA' | 'TRAUMA_PURGATIVO' | 'REFUGIO_ESCENA';
+
+export interface RecoveryOutcome {
+  updatedInvestigator: Investigator;
+  inhGain: number;
+  corDelta: number;
+  acGain: number;
+  note: string;
+}
+
+/**
+ * Section 7: Canonical Inhibition & Stability recovery valves:
+ * - VELO_DISTANCIA: +1 INH & +1 COR after quiet separation
+ * - TRAUMA_PURGATIVO: +1d3 INH at the cost of -1 COR (catharsis)
+ * - REFUGIO_ESCENA (7.2): +1d3 COR, +1d3 AC, +1 INH via an active Lazo Íntimo
+ */
+export function applyRecoveryMethod(
+  inv: Investigator,
+  method: RecoveryMethod,
+  lazoId?: string
+): RecoveryOutcome {
+  if (method === 'VELO_DISTANCIA') {
+    const prevInh = inv.inh;
+    const prevCor = inv.cor;
+    const nextInh = Math.min(inv.initialInh, inv.inh + 1);
+    const nextCor = Math.min(inv.maxCor, inv.cor + 1);
+    return {
+      updatedInvestigator: { ...inv, inh: nextInh, cor: nextCor },
+      inhGain: nextInh - prevInh,
+      corDelta: nextCor - prevCor,
+      acGain: 0,
+      note: `Velo y distancia (Sec. 7): recuperas +${nextInh - prevInh} INH y +${nextCor - prevCor} COR en silencio.`,
+    };
+  }
+
+  if (method === 'TRAUMA_PURGATIVO') {
+    const roll = rollDiceNotation('1d3').total;
+    const prevInh = inv.inh;
+    const nextInh = Math.min(inv.initialInh, inv.inh + roll);
+    const nextCor = Math.max(0, inv.cor - 1);
+    return {
+      updatedInvestigator: { ...inv, inh: nextInh, cor: nextCor },
+      inhGain: nextInh - prevInh,
+      corDelta: nextCor - inv.cor,
+      acGain: 0,
+      note: `Trauma purgativo (Sec. 7): consolidas +${nextInh - prevInh} INH (1d3=${roll}) al precio de -1 COR.`,
+    };
+  }
+
+  // REFUGIO_ESCENA (7.2)
+  const corGain = rollDiceNotation('1d3').total;
+  const acGainRaw = rollDiceNotation('1d3').total;
+  const prevInh = inv.inh;
+  const nextInh = Math.min(inv.initialInh, inv.inh + 1);
+  const nextCor = Math.min(inv.maxCor, inv.cor + corGain);
+  const nextAc = Math.min(inv.maxAc, inv.ac + acGainRaw);
+
+  return {
+    updatedInvestigator: {
+      ...inv,
+      cor: nextCor,
+      ac: nextAc,
+      inh: nextInh,
+      lazos: lazoId
+        ? inv.lazos.map((l) =>
+            l.id === lazoId ? { ...l, refugeUsedThisSession: true } : l
+          )
+        : inv.lazos,
+    },
+    inhGain: nextInh - prevInh,
+    corDelta: nextCor - inv.cor,
+    acGain: nextAc - inv.ac,
+    note: `Escena de Refugio del Cuerpo (7.2): recuperas +${nextCor - inv.cor} COR, +${nextAc - inv.ac} AC y +${nextInh - prevInh} INH.`,
+  };
+}
+
+/**
+ * Checks whether generated text touches any sealed hard limit keywords so
+ * client/server safeguards can automatically veil or replace the passage.
+ */
+export function filterByHardLimits(
+  text: string,
+  hardLimits: string[]
+): { safe: boolean; text: string } {
+  const lower = text.toLowerCase();
+  const alwaysBlocked = ['menor', 'niño', 'niña', 'infantil', 'adolescente'];
+  for (const kw of alwaysBlocked) {
+    if (lower.includes(kw)) {
+      return {
+        safe: false,
+        text: '[Escena velada automáticamente por el Veto Universal de Seguridad (Sección 1.3.1).]',
+      };
+    }
+  }
+  const limitKeywordMap: Array<{ limitMatch: string; terms: string[] }> = [
+    {
+      limitMatch: 'coacción',
+      terms: ['sin consentimiento', 'forzado', 'forzada', 'obligado', 'obligada'],
+    },
+    {
+      limitMatch: 'gore',
+      terms: ['mutilación', 'vísceras', 'desmembramiento', 'sangre extrema'],
+    },
+    {
+      limitMatch: 'agencia',
+      terms: ['esclavitud definitiva', 'mente borrada para siempre'],
+    },
+  ];
+  for (const limit of hardLimits) {
+    const l = limit.toLowerCase();
+    for (const rule of limitKeywordMap) {
+      if (l.includes(rule.limitMatch)) {
+        if (rule.terms.some((t) => lower.includes(t))) {
+          return {
+            safe: false,
+            text: '[Pasaje suavizado bajo Velo estricto conforme a tus Límites Duros pactados en Sesión Cero.]',
+          };
+        }
+      }
+    }
+  }
+  return { safe: true, text };
+}
+

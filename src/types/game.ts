@@ -172,10 +172,22 @@ export interface Investigator {
   arrebatoRounds: number;
   activeArrebato?: FiliaEntry | null;
   diarioBonusUsed: boolean;
+  diarioPendingSkillBonus?: boolean;
   diarioEntries: DiarioEntry[];
   endurecimiento: EndurecimientoAxes;
   inhAnomalyFixed?: boolean; // For special cases or custom rules
+  isDead?: boolean;
+  isCascaron?: boolean;
   armor?: number;
+}
+
+export interface CombatSessionSnapshot {
+  entity: BestiaryEntity;
+  round: number;
+  entityPenalty: number;
+  ironUsed: boolean;
+  pendingBurnedPm: number;
+  returnNodeId: string | null;
 }
 
 export interface BestiaryEntity {

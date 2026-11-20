@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   ArrowRight,
   Check,
+  Lock,
   ShieldCheck,
   Sparkles,
   UserCheck,
@@ -29,10 +30,12 @@ interface SessionZeroModalProps {
   onCancel: () => void;
 }
 
+const LOCKED_MINOR_VETO = 'Implicación de menores';
+
 const HARD_LIMIT_OPTIONS = [
   'Coacción sexual no consentida',
   'Daño gráfico extremo o gore sexual',
-  'Implicación de menores',
+  LOCKED_MINOR_VETO,
   'Pérdida permanente de agencia sin pacto previo',
 ];
 
@@ -44,7 +47,12 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
   onCancel,
 }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [consent, setConsent] = useState<ConsentDocument>(initialConsent);
+  const [consent, setConsent] = useState<ConsentDocument>(() => ({
+    ...initialConsent,
+    hardLimits: initialConsent.hardLimits.includes(LOCKED_MINOR_VETO)
+      ? initialConsent.hardLimits
+      : [...initialConsent.hardLimits, LOCKED_MINOR_VETO],
+  }));
   const [selectedInvId, setSelectedInvId] = useState<string>(
     initialInvestigatorId || INVESTIGATORS[0].id
   );
@@ -58,6 +66,7 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
     STORY_ARCS.find((a) => a.id === selectedArcId) || STORY_ARCS[0];
 
   const toggleHardLimit = (limit: string) => {
+    if (limit === LOCKED_MINOR_VETO) return;
     setConsent((prev) => ({
       ...prev,
       hardLimits: prev.hardLimits.includes(limit)
@@ -69,7 +78,16 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
   const handleLaunch = () => {
     // Deep clone investigator so restarts never mutate canonical template
     const cloned: Investigator = JSON.parse(JSON.stringify(selectedInvestigator));
-    onConfirm(consent, cloned, selectedArc);
+    onConfirm(
+      {
+        ...consent,
+        hardLimits: consent.hardLimits.includes(LOCKED_MINOR_VETO)
+          ? consent.hardLimits
+          : [...consent.hardLimits, LOCKED_MINOR_VETO],
+      },
+      cloned,
+      selectedArc
+    );
   };
 
   return (
@@ -260,24 +278,45 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {HARD_LIMIT_OPTIONS.map((limit) => {
-                      const active = consent.hardLimits.includes(limit);
+                      const isLockedMinorVeto = limit === LOCKED_MINOR_VETO;
+                      const active =
+                        isLockedMinorVeto || consent.hardLimits.includes(limit);
                       return (
                         <button
                           key={limit}
                           type="button"
+                          disabled={isLockedMinorVeto}
                           onClick={() => toggleHardLimit(limit)}
-                          className={`p-2.5 rounded-lg border text-left text-xs flex items-center gap-2 transition-colors ${
-                            active
-                              ? 'border-[#2e7d7b]/60 bg-[#2e7d7b]/15 text-[#ece3d5]'
-                              : 'border-[rgba(216,198,174,0.14)] bg-[#09080c] text-[#7c7166]'
+                          title={
+                            isLockedMinorVeto
+                              ? 'Veto universal innegociable (Sección 1.3.1): bloqueado en todas las partidas.'
+                              : undefined
+                          }
+                          className={`p-2.5 rounded-lg border text-left text-xs flex items-center justify-between gap-2 transition-colors ${
+                            isLockedMinorVeto
+                              ? 'border-[#6ad1cc]/50 bg-[#102022] text-[#ece3d5] cursor-not-allowed'
+                              : active
+                                ? 'border-[#2e7d7b]/60 bg-[#2e7d7b]/15 text-[#ece3d5]'
+                                : 'border-[rgba(216,198,174,0.14)] bg-[#09080c] text-[#9b8f82]'
                           }`}
                         >
-                          <Check
-                            className={`w-3.5 h-3.5 shrink-0 ${
-                              active ? 'text-[#6ad1cc]' : 'opacity-20'
-                            }`}
-                          />
-                          <span>{limit}</span>
+                          <span className="flex items-center gap-2">
+                            {isLockedMinorVeto ? (
+                              <Lock className="w-3.5 h-3.5 shrink-0 text-[#6ad1cc]" />
+                            ) : (
+                              <Check
+                                className={`w-3.5 h-3.5 shrink-0 ${
+                                  active ? 'text-[#6ad1cc]' : 'opacity-20'
+                                }`}
+                              />
+                            )}
+                            <span>{limit}</span>
+                          </span>
+                          {isLockedMinorVeto && (
+                            <span className="text-[10px] font-mono-tabular text-[#6ad1cc] shrink-0">
+                              1.3.1
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -324,7 +363,7 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
                           : 'border-[rgba(216,198,174,0.14)] bg-[#09080c]/80 hover:border-[rgba(216,198,174,0.3)]'
                       }`}
                     >
-                      <div className="w-12 h-12 shrink-0">
+                      <div className="w-14 h-14 shrink-0">
                         <InvestigatorCrest
                           portraitKey={inv.portraitKey}
                           name={inv.name}
@@ -349,7 +388,7 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
               {/* Selected Investigator Detailed Dossier */}
               <div className="lg:col-span-5 p-5 rounded-xl bg-[#09080c]/90 border border-[#c59b4e]/35 space-y-4">
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 shrink-0">
+                  <div className="w-20 h-20 shrink-0">
                     <InvestigatorCrest
                       portraitKey={selectedInvestigator.portraitKey}
                       name={selectedInvestigator.name}

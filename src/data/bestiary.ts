@@ -1,4 +1,4 @@
-import { BestiaryEntity } from '../types/game';
+import type { BestiaryEntity } from '../types/game.ts';
 
 export const BESTIARY_ENTITIES: BestiaryEntity[] = [
   {

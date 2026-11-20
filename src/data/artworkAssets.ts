@@ -1,4 +1,4 @@
-import { BestiaryEntity, StoryNode } from '../types/game';
+import { BestiaryEntity, Investigator, StoryNode } from '../types/game';
 
 export const ARTWORK_PATHS = {
   heroConservatory: '/src/assets/images/hero_grimoire_altar_1795148415036.jpg',
@@ -7,6 +7,52 @@ export const ARTWORK_PATHS = {
   tarotCrypt: '/src/assets/images/arc_doble_cripta_1795148414445.jpg',
   abyssCove: '/src/assets/images/sea_abyss_sanctuary_1795148414829.jpg',
 } as const;
+
+export const INVESTIGATOR_PORTRAITS: Record<
+  Investigator['portraitKey'],
+  { imageSrc: string; ringHex: string; fallbackBg: string }
+> = {
+  elena: {
+    imageSrc: '/src/assets/images/portrait_elena_1795205480033.jpg',
+    ringHex: '#d43750',
+    fallbackBg: '#26131c',
+  },
+  lara: {
+    imageSrc: '/src/assets/images/portrait_lara_1795205479886.jpg',
+    ringHex: '#c59b4e',
+    fallbackBg: '#1b1626',
+  },
+  eduard: {
+    imageSrc: '/src/assets/images/portrait_eduard_1795205480533.jpg',
+    ringHex: '#6ad1cc',
+    fallbackBg: '#171b24',
+  },
+  leonor: {
+    imageSrc: '/src/assets/images/portrait_leonor_1795205479919.jpg',
+    ringHex: '#e5be6e',
+    fallbackBg: '#24151e',
+  },
+  marisa: {
+    imageSrc: '/src/assets/images/portrait_marisa_1795205479784.jpg',
+    ringHex: '#d4892a',
+    fallbackBg: '#261a12',
+  },
+  sofia: {
+    imageSrc: '/src/assets/images/portrait_sofia_1795205480585.jpg',
+    ringHex: '#d43750',
+    fallbackBg: '#221421',
+  },
+  flor: {
+    imageSrc: '/src/assets/images/portrait_flor_1795205480291.jpg',
+    ringHex: '#8ec49e',
+    fallbackBg: '#192219',
+  },
+  marina: {
+    imageSrc: '/src/assets/images/portrait_marina_1795205479437.jpg',
+    ringHex: '#6ad1cc',
+    fallbackBg: '#112224',
+  },
+};
 
 export function getEntityPlateMeta(key: BestiaryEntity['artworkKey']): {
   imageSrc: string;

@@ -27,9 +27,11 @@ export const OccultCanvas: React.FC<OccultCanvasProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const prefersReduced =
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const motionMedia =
+      typeof window !== 'undefined'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : null;
+    let prefersReduced = Boolean(motionMedia?.matches);
 
     let animId = 0;
     let width = (canvas.width = window.innerWidth);
@@ -72,7 +74,9 @@ export const OccultCanvas: React.FC<OccultCanvasProps> = ({
 
     let t = 0;
     const render = () => {
-      t += 0.007;
+      if (!prefersReduced) {
+        t += 0.007;
+      }
       ctx.clearRect(0, 0, width, height);
 
       const { primary, secondary } = getPalette();
@@ -123,7 +127,7 @@ export const OccultCanvas: React.FC<OccultCanvasProps> = ({
           if (p.x < -12) p.x = width + 12;
           if (p.x > width + 12) p.x = -12;
         }
-        const flicker = 0.75 + 0.25 * Math.sin(t * 3 + p.phase);
+        const flicker = prefersReduced ? 0.85 : 0.75 + 0.25 * Math.sin(t * 3 + p.phase);
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(${p.phase > 3.14 ? primary : secondary}, ${
@@ -137,11 +141,19 @@ export const OccultCanvas: React.FC<OccultCanvasProps> = ({
       }
     };
 
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      prefersReduced = e.matches;
+      cancelAnimationFrame(animId);
+      render();
+    };
+    motionMedia?.addEventListener('change', handleMotionChange);
+
     render();
 
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('resize', handleResize);
+      motionMedia?.removeEventListener('change', handleMotionChange);
     };
   }, [corruptionRatio, ambientTag]);
 
