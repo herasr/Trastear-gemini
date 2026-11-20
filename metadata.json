@@ -1,0 +1,6 @@
+{
+  "name": "Pecados de la Carne",
+  "description": "Juego de rol interactivo de terror cósmico, tentación y combate íntimo basado en el sistema BRP D100.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

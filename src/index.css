@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Lora', Georgia, serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+    --surface-void: #09080c;
+    --surface-velvet: #121017;
+    --surface-card: #18151f;
+    --surface-elevated: #211c29;
+    --border-hairline: rgba(216, 198, 174, 0.14);
+    --border-gold: rgba(197, 155, 78, 0.32);
+
+    --ink-primary: #ece3d5;
+    --ink-secondary: #b5a998;
+    --ink-muted: #7c7166;
+
+    --accent-crimson: #a81c34;
+    --accent-crimson-bright: #d43750;
+    --accent-brass: #c59b4e;
+    --accent-abyss: #2e7d7b;
+    --accent-amber: #d4892a;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--surface-void);
+    color: var(--ink-primary);
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-display, .font-serif-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono-tabular {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom subtle scrollbars for grimoire panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(18, 16, 23, 0.6);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(197, 155, 78, 0.25);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(197, 155, 78, 0.45);
+}
+
+@keyframes subtleFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-subtle-float {
+  animation: subtleFloat 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-subtle-float {
+    animation: none;
+  }
+}
