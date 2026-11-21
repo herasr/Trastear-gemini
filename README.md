@@ -15,9 +15,17 @@ Mesa virtual interactiva (VTT + librojuego) para el módulo de horror erótico-c
   - **Veto Universal de Menores (Sec. 1.3.1)** bloqueado permanentemente y filtro automático sobre prosa generada.
   - **Tarjeta X** (atajo global `X`, con opciones de rebobinar a escena anterior, velar o saltar) y **Palabra Ámbar**.
   - **Co-escritura obligatoria en Tabla E (Sec. 3.5.2 y 17.7)** al alcanzar `0 INH`.
+  - **Escala narrativa de tres niveles (Sec. 1.2)**: Nivel 0 *Velo estricto* (elipsis), Nivel 1 *Sensual literario* (no explícito) y Nivel 2 *Directo* (escenas íntimas completas). El Nivel 2 solo se activa si la Sesión Cero lo fija como máximo, lo que equivale al consentimiento unánime de la mesa (Sec. 1.3.1); en la barra de seguridad queda bloqueado por encima de ese máximo.
+  - **Texto sin mecánica**: la prosa que lee el jugador nunca nombra reglas (tiradas, puntos, niveles). La mecánica se aplica desde los datos del nodo (`skillCheck`, `inhLoss`, `acDelta`…).
 - **Guardián Narrador y Oráculo IA (servidor Express + Gemini)**:
   - Endpoints `/api/guardian/narrate` (Sección 29 estructurada en JSON) y `/api/guardian/oracle` (RAG sobre reglas y bestiario) manteniendo `GEMINI_API_KEY` estrictamente en servidor, con respaldo determinista local si no hay clave configurada.
   - Privacidad por diseño: nunca se envían notas de consentimiento, la `Herida` ni las entradas del Diario a la API.
+
+## Contenido narrativo
+
+Cada nodo de `src/data/scenarios.ts` tiene hasta tres versiones del texto: `textVelo` (Nivel 0), `textSensual` (Nivel 1) y `textDirecto` (Nivel 2, opcional). Lo mismo vale para los resultados: `narrativeVelo`, `narrativeSensual` y `narrativeDirecto`. Si falta la versión directa, el Nivel 2 recurre a la sensual; la directa nunca se muestra por debajo del Nivel 2. La selección está centralizada en `src/utils/narrativeText.ts`.
+
+La campaña «La silla vacía» (12 sesiones en tres arcos) está descrita en `src/data/campaign.ts` y enlazada con los arcos jugables. Las pruebas de `src/utils/__tests__` validan el grafo de escenas, la ausencia de léxico explícito en los niveles 0 y 1 y la ausencia de mecánica en el texto narrado.
 
 ## Comandos
 

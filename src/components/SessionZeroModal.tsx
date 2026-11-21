@@ -163,6 +163,11 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
                         title: 'Nivel 1 · Sensual literario',
                         desc: 'Prosa sugerente centrada en el pulso, la cercanía, el perfume y el vértigo del deseo sin caer en explicitud gráfica.',
                       },
+                      {
+                        level: 2 as NarrativeLevel,
+                        title: 'Nivel 2 · Directo (solo adultos)',
+                        desc: 'Escenas íntimas explícitas, narradas sin elipsis. Solo si todas las personas de la mesa lo aceptan por escrito (Sección 1.3.1) y se confirma de nuevo al empezar cada arco.',
+                      },
                     ] as const
                   ).map((opt) => (
                     <button
@@ -541,7 +546,7 @@ export const SessionZeroModal: React.FC<SessionZeroModalProps> = ({
                 </span>
                 <span>·</span>
                 <span className="text-[#6ad1cc]">
-                  Nivel {consent.baseLevel === 0 ? '0 (Velo)' : '1 (Sensual)'}
+                  Nivel {consent.baseLevel === 0 ? '0 (Velo)' : consent.baseLevel === 1 ? '1 (Sensual)' : '2 (Directo)'}
                 </span>
               </div>
 

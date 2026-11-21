@@ -31,6 +31,7 @@ import { SessionZeroModal } from './components/SessionZeroModal';
 import { CompendiumView } from './components/CompendiumView';
 import { EntityArtwork, InvestigatorCrest } from './components/EntityArtwork';
 import { ARTWORK_PATHS, getAmbientBackdrop } from './data/artworkAssets';
+import { NARRATIVE_LEVEL_LABELS, pickNodeText } from './utils/narrativeText';
 
 const AGE_GATE_KEY = 'pecados_age_gate_v1';
 
@@ -703,9 +704,7 @@ export default function App() {
                             <span>{currentNode.location}</span>
                             <span aria-hidden="true">·</span>
                             <span className="text-[#6ad1cc]">
-                              {narrativeLevel === 0
-                                ? 'Nivel 0 (Velo estricto)'
-                                : 'Nivel 1 (Sensual literario)'}
+                              {NARRATIVE_LEVEL_LABELS[narrativeLevel]}
                             </span>
                           </div>
                         </div>
@@ -715,10 +714,7 @@ export default function App() {
 
                   {/* Narrative Prose */}
                   <div className="p-5 sm:p-6 space-y-4">
-                    {(narrativeLevel === 0
-                      ? currentNode.textVelo
-                      : currentNode.textSensual
-                    ).map((paragraph, index) => (
+                    {pickNodeText(currentNode, narrativeLevel).map((paragraph, index) => (
                       <p
                         key={index}
                         className="text-base sm:text-[17px] leading-[1.72] text-[#ece3d5]/95"

@@ -196,6 +196,28 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
               <Eye className="w-3.5 h-3.5" />
               <span>Sensual (1)</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (maxAllowedLevel >= 2) onChangeLevel(2);
+              }}
+              disabled={maxAllowedLevel < 2}
+              className={`px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                maxAllowedLevel < 2
+                  ? 'opacity-40 cursor-not-allowed text-[#7c7166]'
+                  : narrativeLevel === 2
+                    ? 'bg-[#9e1b32]/55 text-[#ece3d5] font-medium'
+                    : 'text-[#b5a998] hover:text-[#ece3d5]'
+              }`}
+              title={
+                maxAllowedLevel < 2
+                  ? 'Bloqueado: el Nivel 2 requiere el consentimiento unánime de la mesa en la Sesión Cero'
+                  : 'Nivel 2: Directo, solo adultos con consentimiento unánime'
+              }
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Directo (2)</span>
+            </button>
           </div>
 
           {/* Señal Ámbar */}

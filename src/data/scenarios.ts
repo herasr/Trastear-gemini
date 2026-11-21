@@ -6,7 +6,7 @@ export const STORY_ARCS: StoryArc[] = [
     title: 'La Vigilia de la Zarza',
     subtitle: 'Escenario Completo · Sección 11',
     sourceSection: 'Sección 11 · Actos I–III',
-    recommendedLevel: 'Nivel 0–1 (Velo / Sensual)',
+    recommendedLevel: 'Nivel 0–2 (Velo / Sensual / Directo)',
     synopsis:
       'El invernadero de la finca Herrera lleva trece años en restauración. Una invitación sin remitente te convoca el sábado a la caída para presenciar cómo el jardín elige a su próximo jardinero.',
     startNodeId: 'zarza_intro',
@@ -17,7 +17,7 @@ export const STORY_ARCS: StoryArc[] = [
     title: 'Los Umbrales del Deseo',
     subtitle: 'Antología del Mito · Sección 24',
     sourceSection: 'Secciones 17, 18 y 24',
-    recommendedLevel: 'Nivel 0–1 (Velo / Sensual)',
+    recommendedLevel: 'Nivel 0–2 (Velo / Sensual / Directo)',
     synopsis:
       'Seis puertas abiertas en la misma noche: una habitación que huele a mar, un salón de espejos, una mesa comunal, una cala sin mapa, un umbral hotelero y un teatro vacío. Primero decides; después ruedan los dados.',
     startNodeId: 'umbrales_hub',
@@ -253,7 +253,8 @@ export const STORY_NODES: Record<string, StoryNode> = {
         sublabel: 'Ganas poder, pero algo dentro de ti cede',
         directOutcome: {
           narrativeVelo: 'Dejas que la voz entre un instante en la penumbra. Despiertas con una energía que no es del todo tuya, aunque algo dentro de ti ha cedido terreno.',
-          narrativeSensual: 'Cedes al abrazo de la sombra conocida. La voz de la puerta se convierte en una boca que te besa el cuello, y las manos que se detenían a dos dedos de tu mejilla ahora te recorren el pecho y el vientre con una precisión que te conoce de otros tiempos. Gimes sin contenerte, y el perfume de la víspera te llena la garganta. Tu cuerpo se abre a la sombra como una puerta que lleva años esperando, y la sombra entra sin prisa, con la paciencia de quien espera a que llegues tú. Te corres con un temblor largo que te deja las piernas flojas sobre las sábanas. Al alba tienes más poder en las manos y menos resistencia frente al perfume, y en la piel queda una marca de dedos largos que no se borra al lavarte.',
+          narrativeSensual: 'Cedes al abrazo de la sombra conocida hasta que tu respiración vuelve a ser tuya. Al alba tienes más poder en las manos y menos resistencia frente al perfume.',
+          narrativeDirecto: 'Cedes al abrazo de la sombra conocida. La voz de la puerta se convierte en una boca que te besa el cuello, y las manos que se detenían a dos dedos de tu mejilla ahora te recorren el pecho y el vientre con una precisión que te conoce de otros tiempos. Gimes sin contenerte, y el perfume de la víspera te llena la garganta. Tu cuerpo se abre a la sombra como una puerta que lleva años esperando, y la sombra entra sin prisa, con la paciencia de quien espera a que llegues tú. Te corres con un temblor largo que te deja las piernas flojas sobre las sábanas. Al alba tienes más poder en las manos y menos resistencia frente al perfume, y en la piel queda una marca de dedos largos que no se borra al lavarte.',
           inhLoss: '1d6',
           pmDelta: 3,
           addMarca: 'Visitado en la víspera de la Zarza',
@@ -301,6 +302,11 @@ export const STORY_NODES: Record<string, StoryNode> = {
       'Entre el humo dulce de las antorchas, los presentes respiran al unísono mientras Anselmo inclina el cáliz. El aire quema en la garganta como vino caliente, y cada inspiración te deja la boca más seca.',
       'De entre la maleza emerge la Ninfa. De lejos su belleza duele. De cerca, la tela que la cubre son zarcillos húmedos que se desenroscan con paciencia hacia tus tobillos, y la savia tibia gotea de sus espinas sobre la piedra.',
       'Su perfume pronuncia tu nombre sin palabras, y promete descanso si dejas caer las armas. Todos los ojos del círculo esperan tu respuesta, y tu cuerpo ya ha empezado a contestar por su cuenta.',
+    ],
+    textDirecto: [
+      'Entre el humo dulce de las antorchas, los presentes respiran al unísono mientras Anselmo inclina el cáliz. El aire quema en la garganta como vino caliente, y cada inspiración te deja la boca más seca.',
+      'De entre la maleza emerge la Ninfa. De lejos su belleza duele. De cerca, la tela que la cubre son zarcillos húmedos que se desenroscan con paciencia hacia tus tobillos, y la savia tibia gotea de sus espinas sobre la piedra.',
+      'Su perfume pronuncia tu nombre sin palabras, y promete descanso si dejas caer las armas. Todos los ojos del círculo esperan tu respuesta, y tu cuerpo ya ha empezado a contestar por su cuenta.',
       'Un zarcillo te roza la muñeca y sube por el antebrazo con la lentitud de un dedo que dibuja. Se detiene en el hueco del codo, donde la piel es más fina, y se queda ahí tibio y húmedo. A tu alrededor, Anselmo y los cinco del círculo empiezan a gemir en voz baja, todos al mismo compás, y el sonido se mete bajo tu ropa como una corriente que busca el pecho.',
       'Cuando la Ninfa se acerca, el aire huele a flores que se pudren en una caja cerrada, dulces y pesadas. Su tela se abre sin ruido, y debajo no hay cuerpo sino una superficie cálida que se ondula al ritmo de tu respiración. Un tallo se enrosca en tu cintura, luego en tu muslo, y cada vuelta aprieta lo justo para que notes el calor de la savia en la piel. Puedes resistir, mirar a otra parte o dejar que la presión suba.',
     ],
@@ -335,7 +341,8 @@ export const STORY_NODES: Record<string, StoryNode> = {
         sublabel: 'Enfrentarte a la Ninfa cuerpo a cuerpo, sin apartar la vista',
         directOutcome: {
           narrativeVelo: 'Das un paso al frente bajo el cristal roto. Si logras agotar su fuerza o resistir hasta el alba, podrás imponer tus condiciones al jardín.',
-          narrativeSensual: 'Aceptas el pulso del invernadero cuerpo a cuerpo. Los zarcillos se cierran alrededor de tu cintura, tibios y húmedos, y el duelo empieza sin pausas: cada tirón de la enredadera busca la piel bajo tu ropa, y cada respuesta tuya le devuelve el golpe con la misma intención. Te pegas a su cuerpo de corteza y sientes la presión de muchos puntos a la vez, como si la planta entera te tocara por dentro. Gimes contra su savia, y la Ninfa responde con un sonido parecido a una flor que se abre a destiempo. Cuando te corres, el invernadero entero se estremece con tu temblor, y el tallo que te sujetaba se afloja un instante, lo justo para que decidas si quieres seguir.',
+          narrativeSensual: 'Aceptas el pulso del invernadero cuerpo a cuerpo. Los zarcillos se cierran alrededor de tu cintura, tibios y húmedos, y el duelo empieza sin pausas: cada tirón busca el calor bajo tu ropa y cada respuesta tuya devuelve el golpe.',
+          narrativeDirecto: 'Aceptas el pulso del invernadero cuerpo a cuerpo. Los zarcillos se cierran alrededor de tu cintura, tibios y húmedos, y el duelo empieza sin pausas: cada tirón de la enredadera busca la piel bajo tu ropa, y cada respuesta tuya le devuelve el golpe con la misma intención. Te pegas a su cuerpo de corteza y sientes la presión de muchos puntos a la vez, como si la planta entera te tocara por dentro. Gimes contra su savia, y la Ninfa responde con un sonido parecido a una flor que se abre a destiempo. Cuando te corres, el invernadero entero se estremece con tu temblor, y el tallo que te sujetaba se afloja un instante, lo justo para que decidas si quieres seguir.',
           triggerCombatEntityId: 'ninfa-zarza',
           nextSceneId: 'zarza_acto3_eleccion',
         },
@@ -395,7 +402,8 @@ export const STORY_NODES: Record<string, StoryNode> = {
           label: 'Sujetar los zarcillos y forzar la entrega',
           onSuccess: {
             narrativeVelo: 'Anudas sus propios zarcillos contra la piedra del estanque. La Ninfa te mira con algo parecido al orgullo y entrega un frasco de su savia dorada.',
-            narrativeSensual: 'Con una precisión implacable dominas la tensión de las enredaderas hasta obligar al tallo a ceder. Atas sus zarcillos a la piedra del estanque y la Ninfa se queda quieta, con la respiración agitada y la corteza brillante de sudor. Le recorres la superficie con las manos y sientes cómo cada fibra tiembla bajo tu tacto. Cuando te inclinas sobre ella, la savia gotea tibia por tu muñeca, y el placer de tenerla sometida te sube hasta la garganta. Por primera vez en trece años, alguien ha jugado su juego mejor que ella, y lo sabe porque su cuerpo se rinde antes que sus palabras.',
+            narrativeSensual: 'Con una precisión implacable dominas la tensión de las enredaderas hasta obligar al tallo a ceder. Por primera vez en trece años, alguien ha jugado su juego mejor que ella.',
+            narrativeDirecto: 'Con una precisión implacable dominas la tensión de las enredaderas hasta obligar al tallo a ceder. Atas sus zarcillos a la piedra del estanque y la Ninfa se queda quieta, con la respiración agitada y la corteza brillante de sudor. Le recorres la superficie con las manos y sientes cómo cada fibra tiembla bajo tu tacto. Cuando te inclinas sobre ella, la savia gotea tibia por tu muñeca, y el placer de tenerla sometida te sube hasta la garganta. Por primera vez en trece años, alguien ha jugado su juego mejor que ella, y lo sabe porque su cuerpo se rinde antes que sus palabras.',
             addRelic: 'Lágrima de la Ninfa',
             nextSceneId: 'zarza_final_inversion_end',
           },
@@ -549,6 +557,11 @@ export const STORY_NODES: Record<string, StoryNode> = {
       'En el cristal, las gotas de lluvia suben despacio y dibujan torres que no se corresponden con ninguna ciudad que hayas visto. Una mano invisible roza la sábana y se detiene a la espera de tu decisión.',
     ],
     textSensual: [
+      'El colchón se hunde a tu lado con el peso exacto del cuerpo que más añoras. El aliento junto a tu oído huele a mar profundo y pronuncia tu nombre con la aspereza exacta de tus recuerdos.',
+      '«No quiero obligarte —susurra contra tu cuello—. Quiero que dejes de defenderte de algo que ya te ha encontrado.»',
+      'Los dedos cálidos se detienen sobre la sábana, a centímetros de tu pecho. No avanzarán hasta que tú lo decidas.',
+    ],
+    textDirecto: [
       'El colchón se hunde a tu lado con el peso exacto del cuerpo que más añoras, y el aliento junto a tu oído huele a mar profundo. Pronuncia tu nombre con la aspereza de tus recuerdos, esa manera de arrastrar la sílaba final que nadie más usa.',
       '«No quiero obligarte —susurra contra tu cuello—. Quiero que dejes de defenderte de algo que ya te ha encontrado.»',
       'Los dedos cálidos se detienen sobre la sábana, a centímetros de tu pecho. Tienen más articulaciones de las que deberían caber en una mano: cuentas siete pliegues en cada dedo, y cada pliegue se curva en una dirección distinta. No avanzarán hasta que tú lo decidas, y lo sabes porque ya te estás inclinando hacia ellos.',
@@ -608,7 +621,8 @@ export const STORY_NODES: Record<string, StoryNode> = {
         sublabel: 'Dejar que la marea te reclame la noche entera',
         directOutcome: {
           narrativeVelo: 'No apartas la mano. Te abres a ella despacio, primero con cautela y luego sin nada que esconder, y la escena avanza como avanzan las mareas: sin prisa y sin preguntar. Cuando por fin te quedas quieto, la sábana está húmeda y fría bajo tu espalda, y del lado vacío queda una hendidura en la almohada que tarda en cerrarse.',
-          narrativeSensual: 'Dices que sí en voz alta, y la respuesta es un peso que se sube encima de tu cadera. Las manos de siete pliegues te sujetan los muslos sin apretar, y el colchón se mueve con un ritmo que no es el de la respiración humana: sube, se detiene, vuelve a subir, como si tuviera que llegar a un punto que solo conoce él. Tú te agarras a las sábanas porque necesitas algo que se mueva con tu cuerpo, y en cambio la superficie se vuelve esponjosa y tibia, como arena que cede. Cuando entra en ti, lo hace por fases. Primero sientes una presión que tu cuerpo reconoce y después una plenitud que no debería caber, un calor salino que se extiende por dentro y te hace gemir sin proponértelo. Te mueves contra él, y tu propia respiración se acopla al oleaje del cristal. Las torres de fuera encienden sus ventanas una a una, y tú sigues el compás de cada ventana hasta que el placer se vuelve tan grande que ya no distingues dónde termina tu piel. En el último tramo la voz de la persona que imitaba se rompe, se vuelve dos voces superpuestas, y pronuncias su nombre y el de algo más antiguo al mismo tiempo. Te corres con un temblor que te dobla las piernas y te deja con la boca abierta contra su hombro, que no es un hombro. Después, la respiración se calma en el cuarto, y te quedas tendido con el olor a mar en los labios. Despiertas descansado, con la piel salada y el cuerpo más ligero. Del lado vacío de la cama queda un surco húmedo en la sábana, con la forma de una mano demasiado larga.',
+          narrativeSensual: 'Dices que sí en voz alta, y el colchón te recibe como el agua recibe a quien ya no nada contra ella. Cuando por fin te quedas quieto, la sábana está húmeda y fría, y del lado vacío queda una hendidura en la almohada que tarda en cerrarse.',
+          narrativeDirecto: 'Dices que sí en voz alta, y la respuesta es un peso que se sube encima de tu cadera. Las manos de siete pliegues te sujetan los muslos sin apretar, y el colchón se mueve con un ritmo que no es el de la respiración humana: sube, se detiene, vuelve a subir, como si tuviera que llegar a un punto que solo conoce él. Tú te agarras a las sábanas porque necesitas algo que se mueva con tu cuerpo, y en cambio la superficie se vuelve esponjosa y tibia, como arena que cede. Cuando entra en ti, lo hace por fases. Primero sientes una presión que tu cuerpo reconoce y después una plenitud que no debería caber, un calor salino que se extiende por dentro y te hace gemir sin proponértelo. Te mueves contra él, y tu propia respiración se acopla al oleaje del cristal. Las torres de fuera encienden sus ventanas una a una, y tú sigues el compás de cada ventana hasta que el placer se vuelve tan grande que ya no distingues dónde termina tu piel. En el último tramo la voz de la persona que imitaba se rompe, se vuelve dos voces superpuestas, y pronuncias su nombre y el de algo más antiguo al mismo tiempo. Te corres con un temblor que te dobla las piernas y te deja con la boca abierta contra su hombro, que no es un hombro. Después, la respiración se calma en el cuarto, y te quedas tendido con el olor a mar en los labios. Despiertas descansado, con la piel salada y el cuerpo más ligero. Del lado vacío de la cama queda un surco húmedo en la sábana, con la forma de una mano demasiado larga.',
           acDelta: 3,
           inhLoss: '1d4',
           addMarca: 'Marca de Inmersión (R’lyeh)',
@@ -632,6 +646,11 @@ export const STORY_NODES: Record<string, StoryNode> = {
       '«Póntela y nadie verá lo que temes que vean. Verán lo que deseabas que descubrieran. Puedes marcharte o cruzar esa puerta conmigo.»',
     ],
     textSensual: [
+      'El perfume del salón es caro y antiguo. El anfitrión te mira sin prisa, como alguien que ya conoce todas tus objeciones antes de que las pronuncies.',
+      'La máscara se calienta con solo acercar los dedos. Al otro lado de la puerta del fondo suena una risa idéntica a la tuya, pero mucho más libre.',
+      '«No digas que te he obligado a desear la respuesta», sonríe el anfitrión sin tocar la máscara.',
+    ],
+    textDirecto: [
       'El perfume del salón es caro y antiguo, de cuero y de algo dulce que se quema despacio. El anfitrión te mira sin prisa, como alguien que ya conoce todas tus objeciones antes de que las pronuncies, y en su mirada no hay juicio, solo una paciencia que te desarma más que cualquier reproche.',
       'La máscara se calienta con solo acercar los dedos. Al otro lado de la puerta del fondo suena una risa idéntica a la tuya, pero más libre, sin el freno que tú le pones cada vez que hablas. Te preguntas quién de los dos está detrás de la puerta.',
       '«No digas que te he obligado a desear la respuesta», sonríe el anfitrión sin tocar la máscara. Su voz es amable y suave, y al decirlo se acerca lo justo para que notes el calor de su aliento en la mejilla.',
@@ -682,7 +701,8 @@ export const STORY_NODES: Record<string, StoryNode> = {
         sublabel: 'Entregarte a la persona que la máscara te deja ser',
         directOutcome: {
           narrativeVelo: 'La máscara se adhiere con un calor suave. La escena tras la puerta queda tras un velo de espejos ámbar que no oscurece nada de lo que pasa en la cama. Al salir, tardas un segundo de más en recordar tu expresión habitual.',
-          narrativeSensual: 'Al cruzar hacia el cuarto forrado de espejos, tu reflejo ya no se avergüenza de nada, y la escena que sigue es la de la máscara completa: cada beso, cada empuje, cada palabra que pronuncias frente al cristal. Al salir te queda una deuda con el salón y un recuerdo que ya no es solo tuyo.',
+          narrativeSensual: 'Al cruzar hacia el cuarto forrado de espejos, tu reflejo ya no se avergüenza de nada. La entrega frente al cristal te deja una deuda con el salón y un recuerdo que ya no es solo tuyo.',
+          narrativeDirecto: 'Al cruzar hacia el cuarto forrado de espejos, tu reflejo ya no se avergüenza de nada, y la escena que sigue es la de la máscara completa: cada beso, cada empuje, cada palabra que pronuncias frente al cristal. Al salir te queda una deuda con el salón y un recuerdo que ya no es solo tuyo.',
           inhLoss: '1d3',
           addMarca: 'Deuda con la Máscara (Nyarlathotep)',
           addDeuda: '1 Deuda con el Salón de las Mil Promesas',
@@ -706,6 +726,10 @@ export const STORY_NODES: Record<string, StoryNode> = {
       'Fuera, las ramas golpean los cristales al compás de una percusión lenta que sube desde el suelo.',
     ],
     textSensual: [
+      'Un vapor cálido a miel quemada sube de la taza de barro. Por un instante sientes el cansancio compartido de toda la casa y una aceptación tan honda que desarma cualquier defensa.',
+      '«¿Cuál es el precio?», preguntas. Ella apoya sus dedos cerca de los tuyos sin presionar: «Que cuando otra persona llegue a esta mesa, hagas sitio».',
+    ],
+    textDirecto: [
       'Un vapor cálido a miel quemada sube de la taza de barro. Notas el cansancio compartido de toda la casa, y una aceptación tan honda que desarma cualquier defensa que te quedara.',
       '«¿Cuál es el precio?», preguntas. Ella apoya los dedos cerca de los tuyos sin presionar: «Que cuando otra persona llegue a esta mesa, hagas sitio».',
       'En la sala contigua hay un colchón de paja cubierto de mantas, y de cada manta sale un calor humano que se nota desde la puerta. Una voz masculina ríe bajito y alguien pregunta si ya te has quitado la chaqueta. Nadie te obliga a nada. Te quedas de pie, con el vapor en la cara, y sabes que lo que decidas aquí no lo olvidarás en ningún otro sitio.',
@@ -768,6 +792,10 @@ export const STORY_NODES: Record<string, StoryNode> = {
       'Puedes quedarte en la orilla, aceptar un favor de linaje o adentrarte en la corriente.',
     ],
     textSensual: [
+      'El mar está casi corporal, más cálido que el aire nocturno. Los dedos finos del emisario rozan un instante tu muñeca y el olor a sal limpia resulta extrañamente reconfortante.',
+      'En el murmullo de la marea oyes nombres pronunciados con afecto antiguo. «Si quieres verlo, la corriente puede enseñártelo.»',
+    ],
+    textDirecto: [
       'El agua está casi a temperatura de cuerpo, más cálida que el aire de la noche. Los dedos finos del emisario rozan un instante tu muñeca, y el olor a sal limpia te resulta extrañamente reconfortante, como el de la ropa recién lavada en casa de tu abuela.',
       'En el murmullo de la marea oyes nombres pronunciados con un afecto antiguo, repetidos con la misma entonación. «Si quieres verlo, la corriente puede enseñártelo.»',
       'Te acercas al borde del agua con los pies descalzos. Cuando la ola sube hasta la rodilla, notas una presión suave que te aprieta los muslos por dentro, como si alguien te sostuviera para que no caigas. El emisario no se mueve de la orilla, pero las líneas de su cuello vibran al mismo ritmo que el agua.',
@@ -831,6 +859,10 @@ export const STORY_NODES: Record<string, StoryNode> = {
     ],
     textSensual: [
       'Al otro lado del umbral, la figura que más deseaste recuperar te mira con una tristeza auténtica. «Porque todavía piensas que tú y yo somos preguntas distintas», susurra.',
+      'Flotan partículas de luz con escenas compartidas: manos bajo una mesa, trenes perdidos, palabras que nunca se dijeron a tiempo.',
+    ],
+    textDirecto: [
+      'Al otro lado del umbral, la figura que más deseaste recuperar te mira con una tristeza auténtica. «Porque todavía piensas que tú y yo somos preguntas distintas», susurra.',
       'Flotan partículas de luz con escenas compartidas: manos bajo una mesa, trenes perdidos, palabras que nunca se dijeron a tiempo. Una de esas partículas se te posa en el labio inferior y te quema un poco.',
       'Te acercas al marco. El aire de la habitación huele a la colonia de aquel verano, a sábanas de algodón y a lluvia en el cristal. La figura abre los brazos sin decir nada, y el gesto es tan familiar que se te afloja el pecho.',
       'Cruzas el umbral. Tiene la piel del hombro que recordabas, con la misma pequeña cicatriz junto a la clavícula. Lo besas y el beso sabe a todos los besos que te diste en esa época. Las manos de ambos se buscan sin pensar. Le quitas la camisa y su piel se estremece bajo tus dedos, cálida como cuando dormía a tu lado. Tú también te quedas desnudo, y la luz de la tarde antigua te baña el cuerpo con un calor que no es de este siglo.',
@@ -869,7 +901,7 @@ export const STORY_NODES: Record<string, StoryNode> = {
         sublabel: 'Quedarte con alguien que ya no está en ningún otro sitio',
         directOutcome: {
           narrativeVelo: 'Cruzas el marco. La escena ocurre tras un velo de tiempos superpuestos. Al regresar conservas un recuerdo que pertenecía a la otra persona y que ya no es posible devolver.',
-          narrativeSensual: 'Al cruzar, la frontera entre tu piel y la suya se vuelve difusa: cada caricia la sientes en dos cuerpos a la vez, y cada orgasmo llega en dos tiempos distintos. Regresas al hotel con un lazo que no entra en ninguna cuenta.',
+          narrativeSensual: 'Al cruzar, la frontera entre tu piel y la suya se vuelve difusa: cada caricia la sientes en dos cuerpos a la vez, y el placer llega siempre en dos tiempos distintos. Regresas al hotel con un lazo que no entra en ninguna cuenta.',
           inhLoss: '1d4',
           addMarca: 'Lazo No Euclidiano (Yog-Sothoth)',
           nextSceneId: 'umbrales_hub',
@@ -892,6 +924,10 @@ export const STORY_NODES: Record<string, StoryNode> = {
       'En el espejo del fondo ves una versión tuya más segura, más hermosa, y que se mueve un segundo antes que tú.',
     ],
     textSensual: [
+      'La luz ámbar sobre las tablas vuelve cálida cada sombra. Una figura ligada a tu pasado espera al otro lado del escenario mientras la página tres del libreto aparece subrayada en amarillo con una frase que aún no has pronunciado.',
+      '«Conserva tu nombre si quieres —dice el director desde la penumbra—. Por ahora.»',
+    ],
+    textDirecto: [
       'La luz ámbar sobre las tablas vuelve cálida cada sombra. Una figura ligada a tu pasado espera al otro lado del escenario, y la página tres del libreto aparece subrayada en amarillo con una frase que aún no has pronunciado.',
       '«Conserva tu nombre si quieres —dice el director desde la penumbra—. Por ahora.»',
       'Lees la frase en voz alta. El teatro se apaga, salvo un foco que cae sobre ti y sobre la figura del otro lado. El espejo se gira para mostrar una segunda escena que no has escrito, con el mismo guion y con tu cuerpo en el papel.',
@@ -1047,14 +1083,17 @@ export const STORY_NODES: Record<string, StoryNode> = {
     entityArtwork: 'doblada',
     ambientTag: 'cripta',
     textVelo: [
-      'A las tres de la madrugada, los brazos de la Doblada te rodean. No aprietan. Sostienen, como se sostiene a alguien que se va cayendo despacio, y ese cuidado es lo más difícil de resistir.',
-      'Entre los rostros reconoces a Ramón, el panadero de la calle de abajo, cincuenta y dos años, con las manos todavía marcadas de harina. Reconoces a Begoña, la vecina del tercero, cuarenta y seis años, que te besó una vez en el portal y nunca lo volvió a mencionar. Reconoces a Julián, el vigilante de la fábrica, cuarenta y nueve años, con la cicatriz de una quemadura en el antebrazo. Ninguno de los tres te suelta.',
+      'A las tres de la madrugada los brazos de la Doblada te rodean. No aprietan. Sostienen, como se sostiene a alguien que se va cayendo despacio, y ese cuidado es lo más difícil de resistir.',
+      'Ramón, el panadero de la calle de abajo, cincuenta y dos años, te sostiene la nuca con una mano todavía marcada de harina. Begoña, la vecina del tercero, cuarenta y seis, te besó una vez en el portal y nunca lo volvió a mencionar; ahora te mira sin pestañear. Julián, el vigilante de la fábrica, tiene cuarenta y nueve años y una quemadura vieja en el antebrazo, y es el único que no habla.',
       'Hay que aguantar hasta el alba sin dejar que el cuerpo decida por ti. El cuerpo, sin embargo, empieza a decidir antes de que termines de pensarlo.',
-      'Te tumban sobre el suelo de piedra, tibio como una sábana que alguien ha planchado. Begoña se inclina sobre ti con el pelo suelto y te habla al oído en un tono áspero, casi divertido: que llevas años con la puerta cerrada, que ya es hora de que alguien entre sin llamar. Ramón responde desde detrás con frases cortas que pesan, y Julián apenas dice nada, como si estuviera tomando nota de cada gesto para no olvidarlo.',
-      'Las caricias se suceden sin que ninguna termine del todo. Se detienen cuando respiras más fuerte, y vuelven cuando te quedas quieto. Te arqueas, gimes, pronuncias nombres que no querías pronunciar. Hay un instante en que el cuerpo deja de ser tuyo del todo y pasa a ser de todos, y en ese instante te corres con un temblor que te deja las piernas blandas. Después vuelven a tocarte, más despacio, y eso es lo que más te cuesta soportar.',
-      'Lo que pasa después de medianoche ocurre con una intimidad que nadie te había pedido, y tú la aceptas porque no puedes evitarlo. Hay caricias, hay preguntas en voz baja, hay un momento en que te reconoces en la voz de otro. Cuando termina la vigilia, te queda la sensación de haber estado entre personas que te conocían mejor que tú, y eso te pesa más que cualquier herida.',
+      'Lo que ocurre después de medianoche se te escurre a medida que lo vives. Recuerdas el suelo tibio, una voz áspera que te dice que ya era hora de que alguien entrara sin llamar, y el momento exacto en que dejas de saber cuántas manos son. El resto queda detrás de una puerta que no llegas a abrir.',
+      'Cuando asoma la primera luz por el respiradero estás tendido en la piedra, con la garganta en carne viva y la sensación de haber sido querido por gente que te conocía mejor que tú. Eso pesa más que cualquier herida.',
     ],
     textSensual: [
+      'Docenas de manos tibias te rodean con una unanimidad que ninguna persona podría igualar. Ninguna aprieta, y tu piel empieza a contestar antes que tú.',
+      'Reconoces entre ellas a Ramón, el panadero de cincuenta y dos años, a Begoña, la vecina del tercero, de cuarenta y seis, y a Julián, el vigilante de la fábrica, de cuarenta y nueve. Aguantas hasta que asoma la primera luz por el respiradero, con el cuerpo recordando cada falta de afecto.',
+    ],
+    textDirecto: [
       'A las tres de la madrugada el círculo se cierra sobre ti sin que nadie se mueva más de lo necesario. Docenas de manos tibias encuentran tus hombros y tu nuca, y lo hacen con una calma que no encaja con el resto de la cripta. Nadie pide nada. Esperan, como se espera en la puerta de una casa a la que se ha llegado tarde.',
       'Intentas pensar en otra cosa. Cuentas las velas, las respiraciones de la masa, el nombre de tu calle. Cada vez que cuentas, una mano baja un poco más por tu espalda y la cuenta se te pierde. Tu cuerpo responde antes que tu cabeza, y lo notas con la rabia de quien se sabe traicionado por su propia piel.',
       'Begoña se inclina sobre tu cara con el pelo suelto. «Llevas tres años con la puerta cerrada —dice con voz áspera, casi divertida—. Ya es hora de que alguien entre sin llamar.» Ramón habla desde detrás, grave, sin prisa: «No tienes que hacer nada. Solo dejar que te toquemos». Julián no dice nada durante un rato, y después, seco: «Tienes el pulso a ciento veinte. Lo noto en el cuello».',
@@ -1083,8 +1122,9 @@ export const STORY_NODES: Record<string, StoryNode> = {
             nextSceneId: 'doble_acto3_resolucion',
           },
           onFail: {
-            narrativeVelo: 'El abrazo te arrastra al borde del clímax, y dejas de contar las horas. Begoña se sienta sobre tu cadera con el pelo caído sobre la cara y te pide que la mires. Julián te sujeta la nuca con cuidado y te dice que lo siente, que no le dejen hacerlo solo. Ramón te rodea la cintura desde atrás, y el ritmo de los cuatro se cierra en uno solo. Te corres varias veces, cada vez con menos claridad sobre quién te toca. Cuando llega el alba, sigues allí, con el pecho lleno de marcas de manos y la voz gastada. Todavía puedes luchar por el desenlace en el último acto, pero ya no tienes el cuerpo que tenías al bajar.',
-            narrativeSensual: 'El calor unánime quiebra tus rodillas y dejas de resistir cuando Begoña se sienta sobre tu cadera, con el pelo caído sobre la cara. «Ahora sí —dice, sin sonreír—. Mírame.» Te mueves con ella, despacio al principio, con las manos de Ramón sujetándote los hombros y la respiración de Julián caliente en la nuca. Cada vez que te corres, otra mano se posa sobre la tuya y la aprieta para que no te sueltes. Julián susurra que lo siente, que no le dejen hacerlo solo, y su voz se rompe en la última palabra. Ramón te penetra desde atrás sin soltar tu cintura, y el ritmo de los cuatro se cierra en un solo empuje que te levanta del suelo. Begoña te clava las uñas en el pecho y te pide que digas su nombre. Lo dices. Te corres dos veces más, y en la segunda ya no distingues cuál de las voces es la de quién. Despiertas al amanecer con el pecho cubierto de marcas de manos que no reconoces como tuyas, y con la sensación de que todos siguen tocándote, aunque en la cripta ya no quede nadie. Al salir, la calle parece más ancha de lo que recordabas, y la gente que pasa por la acera te mira como si ya supiera lo que ha ocurrido bajo la tierra. Esa noche te quedas en la cama con la luz apagada, y notas que el colchón se hunde un poco a tu lado, con un peso que no coincide con el tuyo. Por la mañana encuentras en la mesilla un plato de sopa tibia que no recuerdas haber pedido, y junto al plato, una cuchara limpia con el mango gastado por otras manos. Julián aparece en tu portal a la hora de comer, sin saludar, y solo dice: «Anoche sonaste igual que la primera vez». Después se va. Nadie vuelve a hablar de la vigilia en el barrio, pero cada vez que cruzas la plaza alguien te sostiene la puerta un segundo más de lo necesario.',
+            narrativeVelo: 'El abrazo te arrastra más allá de lo que querías conceder, y dejas de contar las horas. Begoña te pide que la mires, Julián te dice que lo siente, Ramón no te suelta la cintura. Lo que sigue queda tras la misma puerta cerrada. Al alba sigues allí, con el pecho lleno de marcas de manos y la voz gastada. Todavía puedes luchar por el desenlace en el último acto, pero ya no tienes el cuerpo que tenías al bajar.',
+            narrativeSensual: 'El calor unánime quiebra tus rodillas. Cedes a la ola de Begoña, de Ramón y de Julián, que no se detiene hasta el amanecer, y despiertas con el pecho cubierto de marcas de manos que no reconoces como tuyas.',
+            narrativeDirecto: 'El calor unánime quiebra tus rodillas y dejas de resistir cuando Begoña se sienta sobre tu cadera, con el pelo caído sobre la cara. «Ahora sí —dice, sin sonreír—. Mírame.» Te mueves con ella, despacio al principio, con las manos de Ramón sujetándote los hombros y la respiración de Julián caliente en la nuca. Cada vez que te corres, otra mano se posa sobre la tuya y la aprieta para que no te sueltes. Julián susurra que lo siente, que no le dejen hacerlo solo, y su voz se rompe en la última palabra. Ramón te penetra desde atrás sin soltar tu cintura, y el ritmo de los cuatro se cierra en un solo empuje que te levanta del suelo. Begoña te clava las uñas en el pecho y te pide que digas su nombre. Lo dices. Te corres dos veces más, y en la segunda ya no distingues cuál de las voces es la de quién. Despiertas al amanecer con el pecho cubierto de marcas de manos que no reconoces como tuyas, y con la sensación de que todos siguen tocándote, aunque en la cripta ya no quede nadie. Al salir, la calle parece más ancha de lo que recordabas, y la gente que pasa por la acera te mira como si ya supiera lo que ha ocurrido bajo la tierra. Esa noche te quedas en la cama con la luz apagada, y notas que el colchón se hunde un poco a tu lado, con un peso que no coincide con el tuyo. Por la mañana encuentras en la mesilla un plato de sopa tibia que no recuerdas haber pedido, y junto al plato, una cuchara limpia con el mango gastado por otras manos. Julián aparece en tu portal a la hora de comer, sin saludar, y solo dice: «Anoche sonaste igual que la primera vez». Después se va. Nadie vuelve a hablar de la vigilia en el barrio, pero cada vez que cruzas la plaza alguien te sostiene la puerta un segundo más de lo necesario.',
             acDelta: -6,
             inhLoss: '1d3',
             nextSceneId: 'doble_acto3_resolucion',

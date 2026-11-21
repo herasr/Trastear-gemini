@@ -98,7 +98,11 @@ async function createServer() {
         'Escribe siempre en español literario sobrio, preciso y atmosférico de horror cósmico.',
         narrativeLevel === 0
           ? 'NIVEL NARRATIVO 0 (VELO ESTRICTO): usa elipsis elegante y sugestión psicológica; cero descripciones corporales explícitas.'
-          : 'NIVEL NARRATIVO 1 (SENSUAL LITERARIO): describe tensión, pulso, temperatura, respiración y geometría imposible sin explicitud gráfica ni vulgaridad.',
+          : narrativeLevel === 1
+            ? 'NIVEL NARRATIVO 1 (SENSUAL LITERARIO): describe tensión, pulso, temperatura, respiración y geometría imposible sin explicitud gráfica ni vulgaridad.'
+            : 'NIVEL NARRATIVO 2 (DIRECTO, solo adultos con consentimiento unánime): narra la escena íntima completa, en tiempo continuo y sin fundido a negro; con acciones concretas, sensación precisa y diálogo propio de cada personaje. Todos los personajes con actividad sexual son adultos con edad explícita. Lo cósmico ocurre dentro del acto, no por turnos.',
+        'ESTILO (aplica en todos los niveles): prosa orgánica con ritmo irregular; sin antítesis formularias («no era X, sino Y»), sin ternas fijas y sin cierres sentenciosos; cada escena termina con una acción, un objeto o una imagen. Prefiere objeto, gesto y dato antes que abstracción. Evita tópicos (escalofrío que recorre, aire denso, tiempo detenido, corazón que martillea). Cada símil se usa una sola vez.',
+        'NUNCA nombres reglas de juego en la prosa narrada: ni tiradas, ni porcentajes, ni puntos de Cordura o Inhibición, ni niveles. La mecánica se aplica por detrás y el texto solo cuenta la experiencia. La sugerencia de regla va únicamente en el campo reglaSugerida.',
         'REGLA INQUEBRANTABLE (Sección 1.3.1): jamás incluyas menores ni situaciones con menores bajo ninguna circunstancia.',
         `LÍMITES DUROS DEL DOCUMENTO DE CONSENTIMIENTO (prohibido cruzarlos): ${safeLimits.join('; ')}.`,
         'Principio de mesa: Un éxito de Seducción o Persuasión nunca convierte un rechazo del personaje en consentimiento.',
