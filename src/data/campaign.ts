@@ -1,16 +1,14 @@
-// Campaña «La silla vacía» — primera campaña de Pecados de la Carne.
-// Solo datos. Las escenas jugables viven en scenarios.ts; esta capa describe
-// la estructura de sesiones, el reparto, las células y las salidas de
-// seguridad para los flags extremos (Sección 1.3.2).
+// Campaña «La silla vacía». Solo datos. Las escenas jugables viven en scenarios.ts.
+// Los campos de prosa describen la historia; los campos de datos la estructuran.
 
 export type CampaignLevel = 0 | 1 | 2 | 3;
 
 export interface CampaignSession {
   number: number;
   title: string;
-  /** Id de un StoryArc existente en scenarios.ts, si la sesión juega una escena concreta. */
+  /** Id de un StoryArc existente en scenarios.ts, si la sesión sigue una escena concreta. */
   linkedArcId?: string;
-  /** Flags extremos que pueden aparecer; siempre telegrafiados la sesión anterior. */
+  /** Temas extremos que pueden aparecer; siempre se anuncian la sesión anterior. */
   extremeFlags?: ExtremeFlag[];
 }
 
@@ -29,8 +27,8 @@ export interface CampaignArc {
   theme: string;
   /** Arco de STORY_ARCS que sirve de escenario principal, si lo hay. */
   primaryArcId?: string;
-  /** Ritmo orientativo de Inhibición por personaje (Apéndice K). */
-  inhLoss: [number, number];
+  /** Ritmo orientativo de desgaste por personaje (dato de estructura, no de texto). */
+  pacing: [number, number];
 }
 
 export interface CampaignCast {
@@ -69,7 +67,7 @@ export interface CampaignDefinition {
   cast: CampaignCast[];
   cells: CampaignCell[];
   extremeRules: ExtremeFlagRule[];
-  /** Mínimo de jugadores con vínculo real hacia Candela Ortuño. */
+  /** Mínimo de jugadores con un vínculo real hacia Candela Ortuño. */
   minPlayersWithCandelaBond: number;
 }
 
@@ -87,84 +85,84 @@ export const CAMPAIGN_LA_SILLA_VACIA: CampaignDefinition = {
       title: 'I · El consuelo',
       sessions: [1, 4],
       maxLevel: 1,
-      theme: 'Paranoia, secretos urbanos y consuelo venenoso.',
+      theme: 'Un pueblo que se cuida con demasiado cariño, y una mujer que acepta cada favor como si fuera el último.',
       primaryArcId: 'umbrales-deseo',
-      inhLoss: [6, 12],
+      pacing: [6, 12],
     },
     {
       id: 'arco-carne-florece',
       title: 'II · La carne florece',
       sessions: [5, 8],
       maxLevel: 2,
-      theme: 'Aislamiento, mutaciones y ritos rurales.',
+      theme: 'Un invernadero que lleva trece años cerrado, un jardinero que sonríe demasiado y un río que espera.',
       primaryArcId: 'vigilia-zarza',
-      inhLoss: [12, 20],
+      pacing: [12, 20],
     },
     {
       id: 'arco-entrega',
       title: 'III · La entrega',
       sessions: [9, 12],
       maxLevel: 3,
-      theme: 'Tragedia de campaña y desenlaces irreversibles.',
+      theme: 'Una casa de barrio con una cripta debajo, una puerta que ya sabe el nombre de todos y una decisión que no admite prórroga.',
       primaryArcId: 'doble-vigilia',
-      inhLoss: [15, 25],
+      pacing: [15, 25],
     },
   ],
 
   sessions: [
-    { number: 1, title: 'Sesión Cero y primera invitación', linkedArcId: 'umbrales-deseo' },
-    { number: 2, title: 'La mesa de la Escucha', linkedArcId: 'umbrales-deseo' },
+    { number: 1, title: 'Una carta sin remitente', linkedArcId: 'umbrales-deseo' },
+    { number: 2, title: 'Los martes de la Escucha', linkedArcId: 'umbrales-deseo' },
     { number: 3, title: 'Lo que Candela no cuenta' },
     { number: 4, title: 'La cena de los Silleros' },
     { number: 5, title: 'La verja de la finca Herrera', linkedArcId: 'vigilia-zarza' },
     { number: 6, title: 'La víspera', linkedArcId: 'vigilia-zarza' },
-    { number: 7, title: 'La Vigilia de la Zarza', linkedArcId: 'vigilia-zarza' },
+    { number: 7, title: 'La vigilia de la Zarza', linkedArcId: 'vigilia-zarza' },
     { number: 8, title: 'El Cárcavo y el Salto' },
     { number: 9, title: 'La cripta de la calle de los Silleros', linkedArcId: 'doble-vigilia' },
     { number: 10, title: 'Valdetrigo y la cosecha', extremeFlags: ['cria'] },
-    { number: 11, title: 'La Doble Vigilia', linkedArcId: 'doble-vigilia', extremeFlags: ['fusion', 'mortalidad-intima'] },
+    { number: 11, title: 'La doble vigilia', linkedArcId: 'doble-vigilia', extremeFlags: ['fusion', 'mortalidad-intima'] },
     { number: 12, title: 'Desgarro, fuego o silla', linkedArcId: 'doble-vigilia', extremeFlags: ['fusion', 'mortalidad-intima'] },
   ],
 
   cast: [
     {
       name: 'El Amigo',
-      role: 'Falso Confidente que opera el Círculo; cambia de rostro, conserva las manos.',
+      role: 'Un hombre amable que cambia de rostro cada vez que se sienta a tu mesa, pero siempre tiene las mismas manos largas y tibias.',
       ref: 'Sección 6.2',
     },
     {
       name: 'Candela Ortuño',
-      role: 'Enfermera, cebo de la campaña. Empieza con POD 55 y pierde entre 10 y 15 por escena de consuelo.',
-      ref: 'Sección 1.6.1 y 6.2',
+      role: 'Enfermera de treinta y ocho años que llegó a Valderribera tras una ruptura y se quedó en la Mesa de la Escucha. Es la persona a la que todos quieren encontrar.',
+      ref: 'Secciones 1.6.1 y 6.2',
     },
     {
       name: 'Remedios Lledó',
-      role: 'Madre del Círculo. Inhibición 0 desde hace décadas; nunca miente.',
+      role: 'Viuda de ochenta y un años que invita a cenar a quien está solo. Sonríe, escucha y nunca miente.',
       ref: 'Sección 9.2',
     },
     {
       name: 'Ramiro Ibáñez',
-      role: 'Confesor laico que preside la Mesa de la Escucha. Se puede salvar a tiempo.',
+      role: 'Psicólogo jubilado que preside la Mesa de la Escucha. Dice lo que cada uno necesita oír, y todavía se le puede convencer de lo contrario.',
       ref: 'Sección 9.2',
     },
     {
       name: 'Anselmo Sierra',
-      role: 'Jardinero de la finca Herrera; oficia la vigilia de la Zarza.',
+      role: 'Jardinero de la finca Herrera, con una cicatriz de espina en la palma que, según él, no le molesta.',
       ref: 'Sección 11',
     },
     {
       name: 'Amalia Vidal',
-      role: 'Viuda elegida el año pasado, con Filia de la Zarza activa.',
+      role: 'Viuda que fue elegida el año pasado y que todavía lleva en el ojal una flor que no se marchita.',
       ref: 'Sección 11',
     },
     {
       name: 'Telmo Quiroga',
-      role: 'Antiguo párroco convertido en Sacerdote del Velo; preside la célula de los Silleros.',
+      role: 'Antiguo párroco de San Millán. Ya no reza, pero su voz sigue sabiendo qué quieres escuchar.',
       ref: 'Sección 6.6',
     },
     {
       name: 'Gaspar Mena',
-      role: 'Presidente de la Comunidad de Regantes; embajador humano de la Señora.',
+      role: 'Presidente de la Comunidad de Regantes. Habla del agua con la paciencia de quien ha decidido no tener prisa.',
       ref: 'Sección 6.5',
     },
   ],
@@ -173,23 +171,23 @@ export const CAMPAIGN_LA_SILLA_VACIA: CampaignDefinition = {
     {
       name: 'Los Silleros',
       seat: 'Calle de los Silleros, 13',
-      entity: 'Congregación Doblada',
+      entity: 'La congregación dormida en la cripta',
       leader: 'Telmo Quiroga',
-      offers: 'Pertenencia total',
+      offers: 'Un lugar entre los que nunca vuelven a estar solos',
       fallsAt: 9,
     },
     {
       name: 'La Zarza',
       seat: 'Finca Herrera',
-      entity: 'Ninfa de la Zarza Negra',
+      entity: 'La Ninfa de la Zarza Negra',
       leader: 'Anselmo Sierra',
-      offers: 'Ser elegido',
+      offers: 'Ser elegido por el jardín',
       fallsAt: 7,
     },
     {
       name: 'La Fosa',
       seat: 'El Cárcavo',
-      entity: 'Vástago de la Fosa',
+      entity: 'El Vástago de la Fosa',
       leader: 'Matías el Pocero',
       offers: 'Una vida distinta, de verdad distinta',
       fallsAt: 8,
@@ -197,17 +195,17 @@ export const CAMPAIGN_LA_SILLA_VACIA: CampaignDefinition = {
     {
       name: 'Las Aguas',
       seat: 'El Salto',
-      entity: 'Señora de las Aguas Dulces',
+      entity: 'La Señora de las Aguas Dulces',
       leader: 'Gaspar Mena',
-      offers: 'Un matrimonio con la corriente',
+      offers: 'Un matrimonio con la corriente, por etapas',
       fallsAt: 8,
     },
     {
       name: 'Los Mayores',
       seat: 'Valdetrigo',
-      entity: 'Cabra de las Dos Sangres',
+      entity: 'La Cabra de las Dos Sangres',
       leader: 'Los ancianos del pueblo',
-      offers: 'Cosecha, salud y fertilidad',
+      offers: 'Cosechas, salud y hijos que la tierra reclama',
       fallsAt: 10,
     },
   ],
@@ -215,31 +213,31 @@ export const CAMPAIGN_LA_SILLA_VACIA: CampaignDefinition = {
   extremeRules: [
     {
       flag: 'fusion',
-      label: 'Fusión / absorción',
-      where: 'Sesiones 11-12, Congregación Doblada (5.5.3)',
-      ifVetoed: 'Sumisión Total (3.4B) con retirada del personaje; sin escena explícita.',
+      label: 'Fusión y absorción',
+      where: 'Sesiones 11 y 12, en la Congregación de la cripta',
+      ifVetoed: 'El personaje se retira y el final se cuenta desde fuera, sin escena explícita.',
     },
     {
       flag: 'mortalidad-intima',
-      label: 'Mortalidad íntima',
+      label: 'Muerte dentro del acto',
       where: 'Sesión 12, opcional',
-      ifVetoed: 'El clímax se resuelve en AC 0 sin riesgo de muerte y con velo.',
+      ifVetoed: 'La escena se corta antes del desenlace y se resuelve con velo.',
     },
     {
       flag: 'cria',
-      label: 'Cría / incubación',
+      label: 'Gestación y cría',
       where: 'Sesión 10, solo la Cabra de las Dos Sangres',
-      ifVetoed: 'La bendición de la cosecha se concede sin siembra, o la escena se elimina.',
+      ifVetoed: 'La cosecha se concede sin gestación, o la escena se elimina.',
     },
     {
       flag: 'mutacion',
-      label: 'Mutación permanente',
-      where: 'Solo si la mesa firma el flag: conversión a Profundo en el Arco III (6.3). Las siembras de nivel 2 no son flag.',
-      ifVetoed: 'Marca visible y filia menor de la Fosa, sin cambios de APA ni conversión.',
+      label: 'Transformación permanente',
+      where: 'Solo si la mesa firma el flag: la conversión en el Arco III.',
+      ifVetoed: 'Una marca visible y una herencia del río, sin cambios de cuerpo.',
     },
     {
       flag: 'snuff-ritual',
-      label: 'Snuff ritual narrado',
+      label: 'Muerte ritual mostrada',
       where: 'No prevista',
       ifVetoed: 'No se juega.',
     },
