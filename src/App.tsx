@@ -750,9 +750,16 @@ export default function App() {
                             </>
                           )}
                         </div>
-                        <p className="text-sm sm:text-base text-[#ece3d5] leading-relaxed">
-                          {pendingOutcome.text}
-                        </p>
+                        <div className="space-y-3">
+                          {pendingOutcome.text.split('\n\n').map((para, i) => (
+                            <p
+                              key={i}
+                              className="text-sm sm:text-base text-[#ece3d5] leading-relaxed"
+                            >
+                              {para}
+                            </p>
+                          ))}
+                        </div>
                         <button
                           type="button"
                           onClick={handleProceedPendingOutcome}

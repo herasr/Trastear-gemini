@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { STORY_NODES } from '../../data/scenarios';
 import { pickNodeText, pickOutcomeText } from '../narrativeText';
+import { filterByHardLimits } from '../brpEngine';
 import type { SceneOutcome, StoryNode } from '../../types/game';
 
 const nodes = Object.values(STORY_NODES) as StoryNode[];
@@ -81,5 +82,21 @@ describe('niveles narrativos', () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it('ningún texto narrado activa el filtro de seguridad por falso positivo', () => {
+    const limits = ['Coacción', 'Gore', 'Agencia'];
+    const velados: string[] = [];
+    for (const node of nodes) {
+      const texts = [...node.textVelo, ...node.textSensual, ...(node.textDirecto ?? [])];
+      for (const o of outcomesOf(node)) {
+        texts.push(o.narrativeVelo, o.narrativeSensual);
+        if (o.narrativeDirecto) texts.push(o.narrativeDirecto);
+      }
+      for (const t of texts) {
+        if (!filterByHardLimits(t, limits).safe) velados.push(`${node.id}: ${t.slice(0, 50)}`);
+      }
+    }
+    expect(velados).toEqual([]);
   });
 });
