@@ -83,3 +83,51 @@
     animation: none;
   }
 }
+
+/* ---------- Ambiente animado de las escenas ---------- */
+@keyframes ambVineGrow { 0% { stroke-dashoffset: 620; } 100% { stroke-dashoffset: 0; } }
+@keyframes ambSway { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+@keyframes ambMote {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 0.55; }
+  100% { transform: translate(14px, -190px); opacity: 0; }
+}
+@keyframes ambTide {
+  0% { transform: translateY(40%); opacity: 0; }
+  30% { opacity: 0.55; }
+  100% { transform: translateY(-60%); opacity: 0; }
+}
+@keyframes ambSheen {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  100% { transform: translateX(380%) skewX(-18deg); }
+}
+@keyframes ambGhost {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.16; }
+  50% { transform: translate(8px, -3px) scale(1.04); opacity: 0.32; }
+}
+@keyframes ambSpot { 0%, 100% { transform: translateX(-50%) rotate(-9deg); } 50% { transform: translateX(-50%) rotate(9deg); } }
+@keyframes ambBreathe { 0%, 100% { transform: scale(0.96); opacity: 0.5; } 50% { transform: scale(1.06); opacity: 0.95; } }
+@keyframes ambRing { 0% { transform: scale(0.4); opacity: 0.5; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes ambGlow { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.1); } }
+@keyframes ambHeartbeat {
+  0% { opacity: 0; }
+  14% { opacity: 0.9; }
+  28% { opacity: 0.2; }
+  42% { opacity: 0.7; }
+  70%, 100% { opacity: 0; }
+}
+@keyframes ambVeil { 0% { transform: translateX(-28%); } 100% { transform: translateX(28%); } }
+
+.amb-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .amb-layer *,
+  .amb-vignette {
+    animation: none !important;
+  }
+}

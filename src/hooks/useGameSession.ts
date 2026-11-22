@@ -104,6 +104,13 @@ export function useGameSession() {
   const [sheetBonusPenalty, setSheetBonusPenalty] = useState<number>(0);
   const [quickPolyNote, setQuickPolyNote] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [animationsEnabled, setAnimationsEnabled] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('pdc_animations') !== 'off';
+    } catch {
+      return true;
+    }
+  });
 
   const [pendingOutcome, setPendingOutcome] = useState<PendingOutcomeState | null>(
     null
@@ -190,6 +197,16 @@ export function useGameSession() {
       },
       ...prev.slice(0, 49),
     ]);
+  };
+
+  const handleToggleAnimations = () => {
+    const next = !animationsEnabled;
+    setAnimationsEnabled(next);
+    try {
+      window.localStorage.setItem('pdc_animations', next ? 'on' : 'off');
+    } catch {
+      /* sin almacenamiento: el ajuste vale solo para esta sesión */
+    }
   };
 
   const handleToggleSound = () => {
@@ -1074,6 +1091,7 @@ export function useGameSession() {
     setSheetBonusPenalty,
     quickPolyNote,
     soundEnabled,
+    animationsEnabled,
     pendingOutcome,
     combatEntity,
     activeCombatSnapshot,
@@ -1087,6 +1105,7 @@ export function useGameSession() {
     hasSavedGame,
     appendChronicle,
     handleToggleSound,
+    handleToggleAnimations,
     handleResumeSaved,
     handleConfirmSessionZero,
     handleChangeLevel,

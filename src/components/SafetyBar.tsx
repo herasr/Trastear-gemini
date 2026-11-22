@@ -19,6 +19,8 @@ interface SafetyBarProps {
   maxAllowedLevel: NarrativeLevel;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  animationsEnabled: boolean;
+  onToggleAnimations: () => void;
   onChangeLevel: (level: NarrativeLevel) => void;
   onTriggerXCard: () => void;
   onTriggerAmber: () => void;
@@ -35,6 +37,8 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
   maxAllowedLevel,
   soundEnabled,
   onToggleSound,
+  animationsEnabled,
+  onToggleAnimations,
   onChangeLevel,
   onTriggerXCard,
   onTriggerAmber,
@@ -100,6 +104,18 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
                 <VolumeX className="w-4 h-4 text-[#7c7166]" />
               )}
               <span>{soundEnabled ? 'Sonido' : 'Silencio'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={onToggleAnimations}
+              className="whitespace-nowrap flex items-center gap-1.5 transition-colors hover:text-[#ece3d5]"
+              aria-label={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+              aria-pressed={animationsEnabled}
+            >
+              <Sparkles
+                className={`w-4 h-4 ${animationsEnabled ? 'text-[#c59b4e]' : 'text-[#7c7166]'}`}
+              />
+              <span>{animationsEnabled ? 'Animaciones' : 'Sin animar'}</span>
             </button>
           </nav>
 
@@ -267,6 +283,20 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
             ) : (
               <VolumeX className="w-4 h-4" />
             )}
+          </button>
+
+          {/* Animations Toggle (también durante la partida) */}
+          <button
+            type="button"
+            onClick={onToggleAnimations}
+            className="p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
+            aria-label={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+            aria-pressed={animationsEnabled}
+            title={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+          >
+            <Sparkles
+              className={`w-4 h-4 ${animationsEnabled ? 'text-[#c59b4e]' : 'text-[#7c7166]'}`}
+            />
           </button>
 
           {/* Return / Restart */}

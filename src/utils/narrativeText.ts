@@ -34,3 +34,12 @@ export function pickOutcomeText(
   if (level === 1) return outcome.narrativeSensual;
   return outcome.narrativeDirecto ?? outcome.narrativeSensual;
 }
+
+/** Una escena es íntima si tiene alguna versión directa, en el texto o en un resultado. */
+export function isIntimateNode(node: StoryNode): boolean {
+  if (node.textDirecto && node.textDirecto.length > 0) return true;
+  return node.choices.some((c) => {
+    const outcomes = [c.directOutcome, c.skillCheck?.onSuccess, c.skillCheck?.onFail];
+    return outcomes.some((o) => Boolean(o?.narrativeDirecto));
+  });
+}
