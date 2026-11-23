@@ -16,7 +16,7 @@ export function ensureUniversalMinorVeto(limits: string[]): string[] {
 }
 
 const ConsentSchema = z.object({
-  baseLevel: z.union([z.literal(0), z.literal(1)]),
+  baseLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   acceptEncantos: z.boolean().default(true),
   acceptArrebato: z.boolean().default(true),
   acceptDrenaje: z.boolean().default(true),
@@ -127,7 +127,7 @@ export const SavedSessionSchema = z.object({
   savedAt: z.string().optional(),
   investigator: InvestigatorSchema,
   consent: ConsentSchema,
-  narrativeLevel: z.union([z.literal(0), z.literal(1)]),
+  narrativeLevel: z.union([z.literal(0), z.literal(1), z.literal(2)]),
   currentArcId: z.string(),
   currentNodeId: z.string(),
   sceneHistory: z.array(z.string()).default([]),

@@ -6,7 +6,9 @@ export type GameState =
   | 'COMPENDIUM'
   | 'GAME_OVER';
 
-export type NarrativeLevel = 0 | 1; // 0 = Velo estricto (elipsis), 1 = Sensual (literario)
+// 0 = Velo estricto (elipsis), 1 = Sensual (literario, no explícito),
+// 2 = Directo (solo adultos; exige consentimiento unánime de la mesa, Sección 1.3.1)
+export type NarrativeLevel = 0 | 1 | 2;
 
 export type SuccessDegree =
   | 'CRITICO'
@@ -292,6 +294,8 @@ export interface SceneChoice {
 export interface SceneOutcome {
   narrativeVelo: string;
   narrativeSensual: string;
+  /** Versión explícita. Solo se muestra en Nivel 2; si falta, se usa narrativeSensual. */
+  narrativeDirecto?: string;
   corLoss?: string; // dice notation or number e.g. "1d4" or "1"
   inhLoss?: string;
   acDelta?: number;
@@ -316,6 +320,8 @@ export interface StoryNode {
   ambientTag: 'zarza' | 'mar' | 'mascara' | 'rebano' | 'cripta' | 'teatro';
   textVelo: string[];
   textSensual: string[];
+  /** Versión explícita. Solo se muestra en Nivel 2; si falta, se usa textSensual. */
+  textDirecto?: string[];
   guardianWhisper?: string;
   choices: SceneChoice[];
   isEnding?: boolean;

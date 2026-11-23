@@ -19,6 +19,8 @@ interface SafetyBarProps {
   maxAllowedLevel: NarrativeLevel;
   soundEnabled: boolean;
   onToggleSound: () => void;
+  animationsEnabled: boolean;
+  onToggleAnimations: () => void;
   onChangeLevel: (level: NarrativeLevel) => void;
   onTriggerXCard: () => void;
   onTriggerAmber: () => void;
@@ -35,6 +37,8 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
   maxAllowedLevel,
   soundEnabled,
   onToggleSound,
+  animationsEnabled,
+  onToggleAnimations,
   onChangeLevel,
   onTriggerXCard,
   onTriggerAmber,
@@ -101,6 +105,18 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
               )}
               <span>{soundEnabled ? 'Sonido' : 'Silencio'}</span>
             </button>
+            <button
+              type="button"
+              onClick={onToggleAnimations}
+              className="whitespace-nowrap flex items-center gap-1.5 transition-colors hover:text-[#ece3d5]"
+              aria-label={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+              aria-pressed={animationsEnabled}
+            >
+              <Sparkles
+                className={`w-4 h-4 ${animationsEnabled ? 'text-[#c59b4e]' : 'text-[#7c7166]'}`}
+              />
+              <span>{animationsEnabled ? 'Animaciones' : 'Sin animar'}</span>
+            </button>
           </nav>
 
           {/* Zone 3: Primary CTA */}
@@ -164,7 +180,7 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
             <button
               type="button"
               onClick={() => onChangeLevel(0)}
-              className={`px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+              className={`min-h-[44px] sm:min-h-0 px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                 narrativeLevel === 0
                   ? 'bg-[#2e7d7b]/30 text-[#6ad1cc] font-medium'
                   : 'text-[#b5a998] hover:text-[#ece3d5]'
@@ -180,7 +196,7 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
                 if (maxAllowedLevel >= 1) onChangeLevel(1);
               }}
               disabled={maxAllowedLevel < 1}
-              className={`px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+              className={`min-h-[44px] sm:min-h-0 px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                 maxAllowedLevel < 1
                   ? 'opacity-40 cursor-not-allowed text-[#7c7166]'
                   : narrativeLevel === 1
@@ -196,13 +212,35 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
               <Eye className="w-3.5 h-3.5" />
               <span>Sensual (1)</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (maxAllowedLevel >= 2) onChangeLevel(2);
+              }}
+              disabled={maxAllowedLevel < 2}
+              className={`min-h-[44px] sm:min-h-0 px-2.5 py-1.5 rounded-sm text-xs flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
+                maxAllowedLevel < 2
+                  ? 'opacity-40 cursor-not-allowed text-[#7c7166]'
+                  : narrativeLevel === 2
+                    ? 'bg-[#9e1b32]/55 text-[#ece3d5] font-medium'
+                    : 'text-[#b5a998] hover:text-[#ece3d5]'
+              }`}
+              title={
+                maxAllowedLevel < 2
+                  ? 'Bloqueado: el Nivel 2 requiere el consentimiento unánime de la mesa en la Sesión Cero'
+                  : 'Nivel 2: Directo, solo adultos con consentimiento unánime'
+              }
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Directo (2)</span>
+            </button>
           </div>
 
           {/* Señal Ámbar */}
           <button
             type="button"
             onClick={onTriggerAmber}
-            className="px-3 py-1.5 rounded border border-[#c59b4e]/45 bg-[#c59b4e]/10 hover:bg-[#c59b4e]/20 text-[#e5be6e] text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 rounded border border-[#c59b4e]/45 bg-[#c59b4e]/10 hover:bg-[#c59b4e]/20 text-[#e5be6e] text-xs font-medium flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
             title={`Señal Ámbar (${amberWord}): suaviza la escena a Nivel 0 inmediatamente`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -213,7 +251,7 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
           <button
             type="button"
             onClick={onTriggerXCard}
-            className="px-3 py-1.5 rounded border border-[#2e7d7b]/60 bg-[#2e7d7b]/20 hover:bg-[#2e7d7b]/35 text-[#6ad1cc] text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
+            className="min-h-[44px] sm:min-h-0 px-3 py-1.5 rounded border border-[#2e7d7b]/60 bg-[#2e7d7b]/20 hover:bg-[#2e7d7b]/35 text-[#6ad1cc] text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0"
             title={`Tarjeta X (${xCardWord}): pausa y salto limpio sin consecuencias`}
           >
             <AlertOctagon className="w-3.5 h-3.5" />
@@ -237,7 +275,7 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
           <button
             type="button"
             onClick={onToggleSound}
-            className="p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
             aria-label={soundEnabled ? 'Silenciar efectos' : 'Activar efectos'}
           >
             {soundEnabled ? (
@@ -247,11 +285,25 @@ export const SafetyBar: React.FC<SafetyBarProps> = ({
             )}
           </button>
 
+          {/* Animations Toggle (también durante la partida) */}
+          <button
+            type="button"
+            onClick={onToggleAnimations}
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
+            aria-label={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+            aria-pressed={animationsEnabled}
+            title={animationsEnabled ? 'Desactivar animaciones' : 'Activar animaciones'}
+          >
+            <Sparkles
+              className={`w-4 h-4 ${animationsEnabled ? 'text-[#c59b4e]' : 'text-[#7c7166]'}`}
+            />
+          </button>
+
           {/* Return / Restart */}
           <button
             type="button"
             onClick={onResetToMenu}
-            className="p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded border border-[rgba(216,198,174,0.18)] text-[#b5a998] hover:text-[#ece3d5] transition-colors shrink-0"
             title="Volver al menú principal"
             aria-label="Volver al menú principal"
           >

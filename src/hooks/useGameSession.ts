@@ -37,6 +37,11 @@ import {
   UNIVERSAL_MINOR_VETO,
 } from '../utils/saveSchema';
 import { soundEngine } from '../utils/soundEngine';
+import {
+  NARRATIVE_LEVEL_LABELS,
+  NARRATIVE_LEVEL_SHORT,
+  pickOutcomeText,
+} from '../utils/narrativeText';
 
 export const STORAGE_KEY = 'pecados_de_la_carne_save_v1';
 
@@ -99,6 +104,13 @@ export function useGameSession() {
   const [sheetBonusPenalty, setSheetBonusPenalty] = useState<number>(0);
   const [quickPolyNote, setQuickPolyNote] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [animationsEnabled, setAnimationsEnabled] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('pdc_animations') !== 'off';
+    } catch {
+      return true;
+    }
+  });
 
   const [pendingOutcome, setPendingOutcome] = useState<PendingOutcomeState | null>(
     null
@@ -187,6 +199,16 @@ export function useGameSession() {
     ]);
   };
 
+  const handleToggleAnimations = () => {
+    const next = !animationsEnabled;
+    setAnimationsEnabled(next);
+    try {
+      window.localStorage.setItem('pdc_animations', next ? 'on' : 'off');
+    } catch {
+      /* sin almacenamiento: el ajuste vale solo para esta sesión */
+    }
+  };
+
   const handleToggleSound = () => {
     const next = !soundEnabled;
     soundEngine.enabled = next;
@@ -266,7 +288,7 @@ export function useGameSession() {
         type: 'SAFETY',
         title: 'Sesión Cero sellada',
         detail: `Investigador: ${chosenInv.name}. Arco: ${chosenArc.title}. Escala máxima: Nivel ${safeConsent.baseLevel} (${
-          safeConsent.baseLevel === 0 ? 'Velo estricto' : 'Sensual'
+          NARRATIVE_LEVEL_SHORT[safeConsent.baseLevel]
         }).`,
         timestamp: new Date().toLocaleTimeString('es-ES', {
           hour: '2-digit',
@@ -284,9 +306,7 @@ export function useGameSession() {
       appendChronicle(
         'SAFETY',
         'Escala narrativa ajustada',
-        `Nivel cambiado a ${
-          lvl === 0 ? 'Nivel 0 (Velo estricto)' : 'Nivel 1 (Sensual literario)'
-        }.`
+        `Nivel cambiado a ${NARRATIVE_LEVEL_LABELS[lvl]}.`
       );
     }
   };
@@ -590,8 +610,7 @@ export function useGameSession() {
 
     setInvestigator(nextInv);
 
-    const rawProse =
-      narrativeLevel === 0 ? outcome.narrativeVelo : outcome.narrativeSensual;
+    const rawProse = pickOutcomeText(outcome, narrativeLevel);
     const filteredProse = filterByHardLimits(rawProse, consent.hardLimits).text;
 
     setPendingOutcome({
@@ -1072,6 +1091,7 @@ export function useGameSession() {
     setSheetBonusPenalty,
     quickPolyNote,
     soundEnabled,
+    animationsEnabled,
     pendingOutcome,
     combatEntity,
     activeCombatSnapshot,
@@ -1085,6 +1105,7 @@ export function useGameSession() {
     hasSavedGame,
     appendChronicle,
     handleToggleSound,
+    handleToggleAnimations,
     handleResumeSaved,
     handleConfirmSessionZero,
     handleChangeLevel,

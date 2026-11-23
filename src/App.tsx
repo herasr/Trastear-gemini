@@ -31,6 +31,10 @@ import { SessionZeroModal } from './components/SessionZeroModal';
 import { CompendiumView } from './components/CompendiumView';
 import { EntityArtwork, InvestigatorCrest } from './components/EntityArtwork';
 import { ARTWORK_PATHS, getAmbientBackdrop } from './data/artworkAssets';
+import { NARRATIVE_LEVEL_LABELS, isIntimateNode, pickNodeText } from './utils/narrativeText';
+import { heartbeatSeconds, resolveAmbienceMode } from './utils/ambience';
+import { usePrefersReducedMotion } from './hooks/usePrefersReducedMotion';
+import { HeartbeatVignette, RevealParagraphs, SceneAmbience } from './components/SceneAmbience';
 
 const AGE_GATE_KEY = 'pecados_age_gate_v1';
 
@@ -103,6 +107,7 @@ function getArcProgressSteps(
 
 export default function App() {
   const session = useGameSession();
+  const reducedMotion = usePrefersReducedMotion();
   const {
     gameState,
     setGameState,
@@ -124,6 +129,7 @@ export default function App() {
     setSheetBonusPenalty,
     quickPolyNote,
     soundEnabled,
+    animationsEnabled,
     pendingOutcome,
     combatEntity,
     activeCombatSnapshot,
@@ -137,6 +143,7 @@ export default function App() {
     hasSavedGame,
     appendChronicle,
     handleToggleSound,
+    handleToggleAnimations,
     handleResumeSaved,
     handleConfirmSessionZero,
     handleChangeLevel,
@@ -262,12 +269,23 @@ export default function App() {
         )
       : 0.18;
 
+  const ambienceMode = resolveAmbienceMode({
+    level: narrativeLevel,
+    intimate: isIntimateNode(currentNode),
+    enabled: animationsEnabled,
+    xCardOpen,
+    reducedMotion,
+  });
+  const heartbeat = heartbeatSeconds(corruptionRatio);
+
   return (
     <div className="min-h-screen relative bg-[#09080c] text-[#ece3d5] flex flex-col selection:bg-[#9e1b32] selection:text-[#ece3d5]">
       <OccultCanvas
         corruptionRatio={corruptionRatio}
         ambientTag={currentNode.ambientTag}
       />
+
+      <HeartbeatVignette mode={ambienceMode} heartbeat={heartbeat} />
 
       <div className="relative z-10 flex-1 flex flex-col">
         <SafetyBar
@@ -276,6 +294,8 @@ export default function App() {
           maxAllowedLevel={consent.baseLevel}
           soundEnabled={soundEnabled}
           onToggleSound={handleToggleSound}
+          animationsEnabled={animationsEnabled}
+          onToggleAnimations={handleToggleAnimations}
           onChangeLevel={handleChangeLevel}
           onTriggerXCard={handleTriggerXCard}
           onTriggerAmber={handleTriggerAmber}
@@ -684,6 +704,11 @@ export default function App() {
                           aria-hidden="true"
                           className="absolute inset-0 bg-gradient-to-r from-[#09080c]/90 via-[#09080c]/60 to-transparent"
                         />
+                        <SceneAmbience
+                          tag={currentNode.ambientTag}
+                          mode={ambienceMode}
+                          heartbeat={heartbeat}
+                        />
 
                         {currentNode.entityArtwork && (
                           <div className="relative z-10 w-24 sm:w-28 aspect-[3/4] shrink-0 rounded-lg overflow-hidden border border-[#c59b4e]/60 shadow-2xl">
@@ -703,9 +728,7 @@ export default function App() {
                             <span>{currentNode.location}</span>
                             <span aria-hidden="true">·</span>
                             <span className="text-[#6ad1cc]">
-                              {narrativeLevel === 0
-                                ? 'Nivel 0 (Velo estricto)'
-                                : 'Nivel 1 (Sensual literario)'}
+                              {NARRATIVE_LEVEL_LABELS[narrativeLevel]}
                             </span>
                           </div>
                         </div>
@@ -715,17 +738,14 @@ export default function App() {
 
                   {/* Narrative Prose */}
                   <div className="p-5 sm:p-6 space-y-4">
-                    {(narrativeLevel === 0
-                      ? currentNode.textVelo
-                      : currentNode.textSensual
-                    ).map((paragraph, index) => (
-                      <p
-                        key={index}
-                        className="text-base sm:text-[17px] leading-[1.72] text-[#ece3d5]/95"
-                      >
-                        {filterByHardLimits(paragraph, consent.hardLimits).text}
-                      </p>
-                    ))}
+                    <RevealParagraphs
+                      scope={`${currentNode.id}-${narrativeLevel}`}
+                      mode={ambienceMode}
+                      className="text-base sm:text-[17px] leading-[1.72] text-[#ece3d5]/95"
+                      paragraphs={pickNodeText(currentNode, narrativeLevel).map(
+                        (paragraph) => filterByHardLimits(paragraph, consent.hardLimits).text,
+                      )}
+                    />
 
                     {currentNode.guardianWhisper && (
                       <div className="p-3.5 rounded-lg bg-[#09080c]/85 border border-[#c59b4e]/35 text-xs text-[#c59b4e] leading-relaxed">
@@ -754,9 +774,14 @@ export default function App() {
                             </>
                           )}
                         </div>
-                        <p className="text-sm sm:text-base text-[#ece3d5] leading-relaxed">
-                          {pendingOutcome.text}
-                        </p>
+                        <div className="space-y-3">
+                          <RevealParagraphs
+                            scope={`out-${pendingOutcome.nextNodeId}-${pendingOutcome.text.length}`}
+                            mode={ambienceMode}
+                            className="text-sm sm:text-base text-[#ece3d5] leading-relaxed"
+                            paragraphs={pendingOutcome.text.split('\n\n')}
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={handleProceedPendingOutcome}
